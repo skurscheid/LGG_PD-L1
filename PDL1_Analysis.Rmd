@@ -4,15 +4,15 @@ title: 'Analysis: Expression levels of PD-L1 (CD274) in lower-grade gliomas (LGG
 author: "Sebastian Kurscheid"
 date: "23 January 2016"
 output:
-  pdf_document:
-    number_sections: yes
-    toc: yes
-    toc_depth: 3
   html_document:
     fontsize: 12
     highlight: default
     number_section: yes
     theme: flatly
+    toc: yes
+    toc_depth: 3
+  pdf_document:
+    number_sections: yes
     toc: yes
     toc_depth: 3
 ---
