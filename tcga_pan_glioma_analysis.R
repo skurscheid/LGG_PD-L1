@@ -42,7 +42,9 @@ setwd(wd)
 glioma_annotations <- read.xls("~/Data/TCGA/GBM/Ceccarelli et al. 2016/mmc2-3.xlsx", 
                                sheet = 1,
                                skip = 1)
+glioma_annotations$Case <- as.character(glioma_annotations$Case)
 rownames(glioma_annotations) <- glioma_annotations$Case
+save(glioma_annotations, file = "glioma_annotations.rda")
 
 # Data pre-processing ---------------------------------------------------
 # load the RNA-Seq data

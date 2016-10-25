@@ -1,6 +1,9 @@
 # "tcga_pan_glioma_analysis.R" needs to be run first
 require(ggplot2)
-# local functions
+require(snowfall)
+
+
+# local functions ---------------------------------------------------------
 load_tcga_450k_level3_data <- function(filename = NULL){
   stopifnot(!is.null(filename))
   tab <- readr::read_tsv(filename, skip = 1)
@@ -12,10 +15,15 @@ load_tcga_450k_level3_data <- function(filename = NULL){
   return(tab)
 }
 
-# load Infinium450k annotation data
-load("~/Data/References/Annotations/Platforms/gr.annot450k.rda")
 
-setwd("~/mount/gduserv/Data/TCGA/GBM/Infinium450k/")
+# global variables --------------------------------------------------------
+cpus = 16
+
+# Data pre-processing -----------------------------------------------------
+# load Infinium450k annotation data
+load("~/Data/TCGA/GBM/Ceccarelli et al. 2016/glioma_annotations.rda")
+load("~/Data/References/Annotations/Platforms/gr.annot450k.rda")
+setwd("~/Data/TCGA/GBM/Infinium450k/")
 
 gdc_manifest_file <- "gdc_manifest.2016-10-15T02_24_40.986744.tsv"
 gdc_manifest <- readr::read_tsv(gdc_manifest_file)
@@ -31,9 +39,14 @@ tcga.gbm.450k <- do.call("cbind", tcga.gbm.450k)
 tcga.gbm.450k <- tcga.gbm.450k[,colnames(tcga.gbm.450k)[grep("Composite", colnames(tcga.gbm.450k), invert=T)]]
 save(tcga.gbm.450k, file = "tcga.gbm.450k.rda")
 
-tcga.lgg.450k.path <- "~/mount/gduserv/Data/TCGA/LGG/DNA_Methylation/JHU_USC__HumanMethylation450/Level_3"
-tcga.lgg.450k.files <- list.files("~/mount/gduserv/Data/TCGA/LGG/DNA_Methylation/JHU_USC__HumanMethylation450/Level_3")
-tcga.lgg.450k <- lapply(tcga.lgg.450k.files, function(x){
+tcga.lgg.450k.path <- "~/Data/TCGA/LGG/DNA_Methylation/JHU_USC__HumanMethylation450/Level_3"
+tcga.lgg.450k.files <- list.files("~/Data/TCGA/LGG/DNA_Methylation/JHU_USC__HumanMethylation450/Level_3")
+snowfall::sfInit(parallel = T,
+       cpus = cpus)
+sfExport("tcga.lgg.450k.files")
+sfExport("tcga.lgg.450k.path")
+sfExport("load_tcga_450k_level3_data")
+tcga.lgg.450k <- sfLapply(tcga.lgg.450k.files, function(x){
   t1 <- load_tcga_450k_level3_data(paste(tcga.lgg.450k.path,
                                          x, 
                                          sep = "/"))
@@ -43,8 +56,7 @@ tcga.lgg.450k <- do.call("cbind", tcga.lgg.450k)
 tcga.lgg.450k <- tcga.lgg.450k[,colnames(tcga.lgg.450k)[grep("Composite", colnames(tcga.lgg.450k), invert=T)]]
 
 #
-load("/Users/u1001407/Data/Collaborations/LGG_PDL1/tcga_gliomas_rna_seq.rda")
-
+load("~/Data/Collaborations/LGG_PDL1/tcga_gliomas_rna_seq.rda")
 ids <- intersect(rownames(glioma_annotations), colnames(tcga.gbm.450k))
 
 # GBM data
@@ -82,13 +94,16 @@ names(GBM.PDL1.methylation.plots) <- colnames(GBM.PDL1.methylation_expression[gr
 
 lgg.ids <- intersect(colnames(tcga.lgg.450k), rownames(glioma_annotations))
 lgg.ids <- intersect(lgg.ids, colnames(tcga_gliomas_rna_seq))
-LGG.PDL1.methylation_expression <- as.data.frame(cbind(IDH_status = as.character(glioma_annotations[lgg.ids, "IDH.status"]),
-                                                       chr1p19q_status = as.character(glioma_annotations[lgg.ids, "X1p.19q.codeletion"]),
+LGG.PDL1.methylation_expression <- as.data.frame(cbind(IDH_status = as.character(glioma_annotations[lgg.ids,]$IDH.status),
+                                                       grade = as.character(glioma_annotations[lgg.ids,]$Grade),
+                                                       histology = as.character(glioma_annotations[lgg.ids,]$Histology),
+                                                       chr1p19q_status = as.character(glioma_annotations[lgg.ids,]$X1p.19q.codeletion),
                                                        t(tcga.lgg.450k[names(gr.annot450k[grep("CD274", gr.annot450k$UCSC_RefGene_Name)]), lgg.ids]),
                                                        CD274 = as.numeric(tcga_gliomas_rna_seq[grep("CD274", rownames(tcga_gliomas_rna_seq)), lgg.ids])))
-for (i in colnames(LGG.PDL1.methylation_expression[grep("status", colnames(LGG.PDL1.methylation_expression), invert = T)])){
+for (i in colnames(LGG.PDL1.methylation_expression[grep("cg|CD", colnames(LGG.PDL1.methylation_expression), invert = F)])){
   LGG.PDL1.methylation_expression[,i] <- as.numeric(as.character(LGG.PDL1.methylation_expression[,i]))
 }
+LGG.PDL1.methylation_expression$IDH_status <- relevel(LGG.PDL1.methylation_expression$IDH_status, ref = "WT")
 table(LGG.PDL1.methylation_expression$IDH_status, LGG.PDL1.methylation_expression$chr1p19q_status)
 lgg.idh_mut.codel <- which(LGG.PDL1.methylation_expression$IDH_status == "Mutant" & LGG.PDL1.methylation_expression$chr1p19q_status == "codel")
 lgg.idh_mut.non_codel <- which(LGG.PDL1.methylation_expression$IDH_status == "Mutant" & LGG.PDL1.methylation_expression$chr1p19q_status == "non-codel")
@@ -116,3 +131,129 @@ LGG.PDL1.methylation.plots <- lapply(colnames(LGG.PDL1.methylation_expression[gr
               anova = aov1))
 })
 names(LGG.PDL1.methylation.plots) <- colnames(LGG.PDL1.methylation_expression[grep("cg", colnames(LGG.PDL1.methylation_expression))])
+
+
+# PD-L1 visualisation of data using Gviz ----------------------------------------
+require(Gviz)
+require(annotatr)
+gr.annot450k.uscs <- gr.annot450k
+seqlevels(gr.annot450k.uscs) <- paste("chr", seqlevels(gr.annot450k.uscs), sep = "")
+
+geneSymbol <- "CD274"
+genome <- "hg19"
+annots <- c("hg19_cpgs", "hg19_cpg_shores", "hg19_cpg_shelves")
+annotations <- build_annotations(genome = genome, annotations = annots)
+gr.data450k <- gr.annot450k.uscs[grep("CD274", gr.annot450k.uscs$UCSC_RefGene_Name)]
+strand(gr.data450k) <- "*"
+
+# preparing data
+LGGData <- LGG.PDL1.methylation_expression[, grep("cg", colnames(LGG.PDL1.methylation_expression))]
+LGGData <- as.matrix(LGGData)
+class(LGGData) <- "numeric"
+
+methExpCorLGG <- sapply(colnames(LGG.PDL1.methylation_expression)[grep("cg", colnames(LGG.PDL1.methylation_expression))], function(x){
+  IDHwt <- cor(as.numeric(LGG.PDL1.methylation_expression[, x]), 
+           as.numeric(LGG.PDL1.methylation_expression[, "CD274"]), 
+           method = "spearman")
+})
+
+GBMData <- GBM.PDL1.methylation_expression[, grep("cg", colnames(GBM.PDL1.methylation_expression))]
+GBMData <- as.matrix(GBMData)
+class(GBMData) <- "numeric"
+
+methExpCorGBM <- sapply(colnames(GBM.PDL1.methylation_expression)[grep("cg", colnames(GBM.PDL1.methylation_expression))], function(x){
+  IDHwt <- cor(as.numeric(GBM.PDL1.methylation_expression[, x]), 
+               as.numeric(GBM.PDL1.methylation_expression[, "CD274"]), 
+               method = "spearman")
+})
+
+
+# preparing Gviz tracks
+gtrack <- GenomeAxisTrack()
+
+itrack <- IdeogramTrack(genome = genome, chromosome = "chr9")
+
+biomTrack <- BiomartGeneRegionTrack(genome = genome,
+                                    symbol = geneSymbol,
+                                    name = "PD-L1\n[Ensembl]",
+                                    showId = F)
+
+gr.pdl1 <- GRanges(seqnames = seqnames(biomTrack@range)[1],
+                   IRanges(start = start(biomTrack@range)[1] - 5000,
+                           end = end(biomTrack@range)[length(end(biomTrack@range))] + 5000),
+                   strand = strand(biomTrack@range)[1])
+
+cpgTrack <- AnnotationTrack(subsetByOverlaps(annotations[grep("islands", annotations$type)], gr.pdl1), 
+                            col = "lightgreen",
+                            fill = "lightgreen",
+                            name = "CpG Islands")
+displayPars(cpgTrack) <- list(rotation.title = 0, cex.title = 0.6)
+
+pos450kTrack <- AnnotationTrack(gr.annot450k.uscs[grep("CD274", gr.annot450k.uscs$UCSC_RefGene_Name)],
+                             col = "black",
+                             fill = "black",
+                             name = "450k probes")
+displayPars(pos450kTrack) <- list(rotation.title = 0, cex.title = 0.6)
+
+LGGdata450kTrackByIDH <- DataTrack(gr.data450k, 
+                                data = LGGData, 
+                                type = c("a"), 
+                                groups = LGG.PDL1.methylation_expression$IDH_status,
+                                name = "LGG\n[beta values]")
+
+LGGdata450kTrackByGrade <- DataTrack(gr.data450k, 
+                                  data = LGGData, 
+                                  type = c("a"),
+                                  groups = LGG.PDL1.methylation_expression$grade,
+                                  name = "LGG\n[beta values]")
+
+LGGdataMethExpCor <- DataTrack(gr.data450k, 
+                            data = methExpCorLGG,
+                            type = c("a"),
+                            name = "Spearman\nCorrelation",
+                            col = "darkblue")
+# plotting
+pdf("~/Data/Collaborations/LGG_PDL1/Gviz_plot_PDL1_LGG.pdf", paper = "a4r")
+plotTracks(list(gtrack, 
+                itrack,
+                biomTrack, 
+                cpgTrack, 
+                pos450kTrack, 
+                LGGdata450kTrackByIDH, 
+                LGGdata450kTrackByGrade,
+                LGGdataMethExpCor), 
+           extend.left = 2000, 
+           extend.right = 2000,
+           main = "PD-L1 Methylation - TCGA LGG Data")
+dev.off()
+
+# GBM
+# preparing data
+
+GBMdata450kTrackByIDH <- DataTrack(gr.data450k, 
+                                data = GBMData, 
+                                type = c("a"), 
+                                groups = GBM.PDL1.methylation_expression$IDH_status,
+                                name = "GBM\n[beta values]")
+GBMdataMethExpCor <- DataTrack(gr.data450k, 
+                            data = methExpCorGBM,
+                            type = c("a"),
+                            name = "Spearman\nCorrelation",
+                            groups = "CD274",
+                            col = "darkblue")
+# plotting
+pdf("~/Data/Collaborations/LGG_PDL1/Gviz_plot_PDL1_GBM.pdf", paper = "a4r")
+plotTracks(list(gtrack, 
+                itrack,
+                biomTrack, 
+                cpgTrack, 
+                pos450kTrack, 
+                GBMdata450kTrackByIDH, 
+                GBMdataMethExpCor), 
+           extend.left = 2000, 
+           extend.right = 2000,
+           main = "PD-L1 Methylation - TCGA GBM Data")
+dev.off()
+levels(LGG.PDL1.methylation_expression$IDH_status)
+
+
