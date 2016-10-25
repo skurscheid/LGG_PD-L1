@@ -1,0 +1,48 @@
+---
+title: "TCGA LGG [IDHmut/MGMGunmeth] Survival data"
+author: "Sebastian Kurscheid"
+date: "10/25/2016"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+require(exactRankTests)
+require(survival)
+require(coin)
+```
+
+### TCGA LGG Survival data for G2/G3 patients with IDHwt and unmethylated MGMT promoter
+
+```{r loading_external_data, cache=TRUE, tidy=TRUE, tidy.opts=(width.cutoff=50), echo = F}
+#----------  load the prepared clinical LGG data --------------
+load("~/Data/Collaborations/LGG_PDL1/tcga_lgg_annotations.rda")
+# some data re-formatting
+```
+
+Survival data for LGG IDHwt and unmethylated MGMT promoter (1 = dead) 
+```{r overview, echo = T, tidy=TRUE, tidy.opts=(width.cutoff=50)}
+# select IDs of patients fitting criteria
+s1 <- rownames(lgg_annotations[which(lgg_annotations$MGMT.promoter.status == "Unmethylated" & lgg_annotations$IDH.status == "WT"),])
+table(lgg_annotations[s1,]$Vital.status..1.dead., useNA = "always")
+```
+
+Prepare data for survival curve:
+```{r survival_data_prep, echo = T, tidy=TRUE, tidy.opts=(width.cutoff=50)}
+tab1 <- data.frame(vital_status = lgg_annotations[s1, "Vital.status..1.dead."],
+                   survival_months = lgg_annotations[s1, "Survival..months."])
+rownames(tab1) <- s1
+print(tab1)
+SurvObj <- with(tab1, Surv(survival_months, vital_status))
+surv <- survfit(SurvObj ~ 1, conf.type = "none")
+summary(surv)
+```
+
+## Kaplan-Meier plot
+```{r km_plot, echo = FALSE, tidy = T, tidy.opts=(width.cutoff=50)}
+plot(surv, xlab = "Time [months]", 
+     ylab = "Survival probability", 
+     main = paste("TCGA LGG IDHwt/MGMTunmethylated [N=", nrow(tab1),"]", sep = ""))
+```
+
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
