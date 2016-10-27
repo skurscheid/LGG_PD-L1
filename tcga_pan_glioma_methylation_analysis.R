@@ -23,7 +23,7 @@ cpus = 16
 # load Infinium450k annotation data
 load("~/Data/TCGA/GBM/Ceccarelli et al. 2016/glioma_annotations.rda")
 load("~/Data/References/Annotations/Platforms/gr.annot450k.rda")
-setwd("~/Data/TCGA/GBM/Infinium450k/")
+setwd("~/Data/Collaborations/LGG_PDL1/")
 
 gdc_manifest_file <- "gdc_manifest.2016-10-15T02_24_40.986744.tsv"
 gdc_manifest <- readr::read_tsv(gdc_manifest_file)
@@ -34,7 +34,6 @@ tcga.gbm.450k <- apply(gdc_manifest, 1, function(x) {
                                          sep = "/"))
   return(t1)
 })
-
 tcga.gbm.450k <- do.call("cbind", tcga.gbm.450k)
 tcga.gbm.450k <- tcga.gbm.450k[,colnames(tcga.gbm.450k)[grep("Composite", colnames(tcga.gbm.450k), invert=T)]]
 save(tcga.gbm.450k, file = "tcga.gbm.450k.rda")
@@ -56,7 +55,14 @@ tcga.lgg.450k <- do.call("cbind", tcga.lgg.450k)
 tcga.lgg.450k <- tcga.lgg.450k[,colnames(tcga.lgg.450k)[grep("Composite", colnames(tcga.lgg.450k), invert=T)]]
 
 #
+
+
+# prepare data tables -----------------------------------------------------
+# load pre-processed data
 load("~/Data/Collaborations/LGG_PDL1/tcga_gliomas_rna_seq.rda")
+load("~/Data/TCGA/GBM/Infinium450k/tcga.gbm.450k.rda")
+load("~/Data/Collaborations/LGG_PDL1/tcga.lgg.450k.rda")
+
 ids <- intersect(rownames(glioma_annotations), colnames(tcga.gbm.450k))
 
 # GBM data
@@ -91,7 +97,6 @@ GBM.PDL1.methylation.plots <- lapply(colnames(GBM.PDL1.methylation_expression[gr
 names(GBM.PDL1.methylation.plots) <- colnames(GBM.PDL1.methylation_expression[grep("cg", colnames(GBM.PDL1.methylation_expression))])
 
 # LGG data
-
 lgg.ids <- intersect(colnames(tcga.lgg.450k), rownames(glioma_annotations))
 lgg.ids <- intersect(lgg.ids, colnames(tcga_gliomas_rna_seq))
 LGG.PDL1.methylation_expression <- as.data.frame(cbind(IDH_status = as.character(glioma_annotations[lgg.ids,]$IDH.status),
@@ -142,7 +147,7 @@ seqlevels(gr.annot450k.uscs) <- paste("chr", seqlevels(gr.annot450k.uscs), sep =
 geneSymbol <- "CD274"
 genome <- "hg19"
 annots <- c("hg19_cpgs", "hg19_cpg_shores", "hg19_cpg_shelves")
-annotations <- build_annotations(genome = genome, annotations = annots)
+annotations <- annotatr::build_annotations(genome = genome, annotations = annots)
 gr.data450k <- gr.annot450k.uscs[grep("CD274", gr.annot450k.uscs$UCSC_RefGene_Name)]
 strand(gr.data450k) <- "*"
 
