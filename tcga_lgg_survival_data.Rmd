@@ -1,5 +1,5 @@
 ---
-title: "TCGA LGG [IDHmut/MGMGunmeth] Survival data"
+title: "TCGA LGG [IDHwt/MGMGunmeth] Survival data"
 author: "Sebastian Kurscheid"
 date: "10/25/2016"
 output: pdf_document
