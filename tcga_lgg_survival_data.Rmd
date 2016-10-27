@@ -45,4 +45,3 @@ plot(surv, xlab = "Time [months]",
      main = paste("TCGA LGG IDHwt/MGMTunmethylated [N=", nrow(tab1),"]", sep = ""))
 ```
 
-Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
