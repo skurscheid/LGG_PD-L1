@@ -204,13 +204,15 @@ LGGdata450kTrackByIDH <- DataTrack(gr.data450k,
                                 data = LGGData, 
                                 type = c("a"), 
                                 groups = LGG.PDL1.methylation_expression$IDH_status,
-                                name = "LGG\n[beta values]")
+                                name = "LGG\n[average beta values/group]")
 
-LGGdata450kTrackByGrade <- DataTrack(gr.data450k, 
-                                  data = LGGData, 
-                                  type = c("a"),
-                                  groups = LGG.PDL1.methylation_expression$grade,
-                                  name = "LGG\n[beta values]")
+gr.data450k.boxplots <- gr.data450k
+width(gr.data450k.boxplots) <- 100
+LGGdata450kTrackByIDHboxplot<- DataTrack(gr.data450k.boxplots, 
+                                   data = LGGData, 
+                                   type = c("boxplot"), 
+                                   groups = LGG.PDL1.methylation_expression$IDH_status,
+                                   name = "LGG\n[beta values]")
 
 LGGdataMethExpCor <- DataTrack(gr.data450k, 
                             data = methExpCorLGG,
@@ -225,12 +227,26 @@ plotTracks(list(gtrack,
                 cpgTrack, 
                 pos450kTrack, 
                 LGGdata450kTrackByIDH, 
-                LGGdata450kTrackByGrade,
                 LGGdataMethExpCor), 
-           extend.left = 2000, 
-           extend.right = 2000,
+           extend.left = 500, 
+           extend.right = 500,
            main = "PD-L1 Methylation - TCGA LGG Data")
 dev.off()
+
+pdf("~/Data/Collaborations/LGG_PDL1/Gviz_plot_PDL1_LGG_TSS_detail.pdf", paper = "a4r")
+plotTracks(list(gtrack, 
+                itrack,
+                biomTrack, 
+                cpgTrack, 
+                pos450kTrack, 
+                LGGdata450kTrackByIDH,
+                LGGdata450kTrackByIDHboxplot, 
+                LGGdataMethExpCor),
+           from = start(biomTrack@range)[1] - 800,
+           to = end(biomTrack@range)[1] + 500,
+           main = "PD-L1 Methylation\nTCGA LGG Data - TSS Detail")
+dev.off()
+
 
 # GBM
 # preparing data
@@ -240,6 +256,13 @@ GBMdata450kTrackByIDH <- DataTrack(gr.data450k,
                                 type = c("a"), 
                                 groups = GBM.PDL1.methylation_expression$IDH_status,
                                 name = "GBM\n[beta values]")
+
+GBMdata450kTrackByIDHboxplot <- DataTrack(gr.data450k.boxplots, 
+                                   data = GBMData, 
+                                   type = c("boxplot"), 
+                                   groups = GBM.PDL1.methylation_expression$IDH_status,
+                                   name = "GBM\n[beta values]")
+
 GBMdataMethExpCor <- DataTrack(gr.data450k, 
                             data = methExpCorGBM,
                             type = c("a"),
@@ -258,6 +281,20 @@ plotTracks(list(gtrack,
            extend.left = 2000, 
            extend.right = 2000,
            main = "PD-L1 Methylation - TCGA GBM Data")
+dev.off()
+
+pdf("~/Data/Collaborations/LGG_PDL1/Gviz_plot_PDL1_GBM_TSS_details.pdf", paper = "a4r")
+plotTracks(list(gtrack, 
+                itrack,
+                biomTrack, 
+                cpgTrack, 
+                pos450kTrack, 
+                GBMdata450kTrackByIDH,
+                GBMdata450kTrackByIDHboxplot,
+                GBMdataMethExpCor), 
+           from = start(biomTrack@range)[1] - 800,
+           to = end(biomTrack@range)[1] + 500,
+           main = "PD-L1 Methylation\nTCGA GBM Data - TSS Details")
 dev.off()
 levels(LGG.PDL1.methylation_expression$IDH_status)
 
