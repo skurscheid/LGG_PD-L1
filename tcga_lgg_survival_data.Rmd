@@ -7,9 +7,7 @@ output: pdf_document
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-require(exactRankTests)
 require(survival)
-require(coin)
 ```
 
 ### TCGA LGG Survival data for G2/G3 patients with IDHwt and unmethylated MGMT promoter
