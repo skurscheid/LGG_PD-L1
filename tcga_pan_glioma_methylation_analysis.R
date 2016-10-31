@@ -189,11 +189,35 @@ GBMData <- GBM.PDL1.methylation_expression[, grep("cg", colnames(GBM.PDL1.methyl
 GBMData <- as.matrix(GBMData)
 class(GBMData) <- "numeric"
 
+
+# calculating correlations for GBM data
 methExpCorGBM <- sapply(colnames(GBM.PDL1.methylation_expression)[grep("cg", colnames(GBM.PDL1.methylation_expression))], function(x){
   IDHwt <- cor(as.numeric(GBM.PDL1.methylation_expression[, x]), 
                log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1), 
                method = "spearman")
 })
+
+# XY plots for GBM data
+pdf("TCGA_GBM_PDL1_methylation_expression_XY_plots.pdf")
+par(mfrow = c(3,2))
+methExpXYPlotLGG <- sapply(colnames(GBMData), function(x){
+  c1 <- cor(as.numeric(GBM.PDL1.methylation_expression[, x]), 
+            log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1),
+            method = "spearman")
+  c1 <- round(c1, 2)
+  p1 <-plot(as.numeric(GBM.PDL1.methylation_expression[, x]), 
+            log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1),
+            xlab = paste("Probe ID ", x, " [beta value]", sep = ""),
+            ylab = "PD-L1 [log2(FPKM+1)]",
+            xlim = c(0,1),
+            main = paste("Correlation ", c1, " [Spearman]", sep = ""),
+            pch = c(16, 17)[as.numeric(glioma_annotations[rownames(GBMData),]$IDH.status)],
+            col = c("red", "blue")[as.numeric(glioma_annotations[rownames(GBMData),]$IDH.status)])
+  legend("topright", legend = c("IDHmut", "WT"), col = c("red", "blue"), pch = c(16,17))
+  abline(lm(log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1) ~ as.numeric(GBM.PDL1.methylation_expression[, x])), lwd = 2)
+  lines(lowess(log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1) ~ as.numeric(GBM.PDL1.methylation_expression[, x])), col = "green", lwd = 2)
+})
+dev.off()
 
 
 # preparing Gviz tracks
