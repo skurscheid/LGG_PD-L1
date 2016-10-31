@@ -23,7 +23,7 @@ cpus = 16
 # load Infinium450k annotation data
 load("~/Data/TCGA/GBM/Ceccarelli et al. 2016/glioma_annotations.rda")
 load("~/Data/References/Annotations/Platforms/gr.annot450k.rda")
-setwd("~/Data/TCGA/GBM/Infinium450k/")
+setwd("~/Data/Collaborations/LGG_PDL1/")
 
 gdc_manifest_file <- "gdc_manifest.2016-10-15T02_24_40.986744.tsv"
 gdc_manifest <- readr::read_tsv(gdc_manifest_file)
@@ -34,7 +34,6 @@ tcga.gbm.450k <- apply(gdc_manifest, 1, function(x) {
                                          sep = "/"))
   return(t1)
 })
-
 tcga.gbm.450k <- do.call("cbind", tcga.gbm.450k)
 tcga.gbm.450k <- tcga.gbm.450k[,colnames(tcga.gbm.450k)[grep("Composite", colnames(tcga.gbm.450k), invert=T)]]
 save(tcga.gbm.450k, file = "tcga.gbm.450k.rda")
@@ -56,7 +55,14 @@ tcga.lgg.450k <- do.call("cbind", tcga.lgg.450k)
 tcga.lgg.450k <- tcga.lgg.450k[,colnames(tcga.lgg.450k)[grep("Composite", colnames(tcga.lgg.450k), invert=T)]]
 
 #
+
+
+# prepare data tables -----------------------------------------------------
+# load pre-processed data
 load("~/Data/Collaborations/LGG_PDL1/tcga_gliomas_rna_seq.rda")
+load("~/Data/TCGA/GBM/Infinium450k/tcga.gbm.450k.rda")
+load("~/Data/Collaborations/LGG_PDL1/tcga.lgg.450k.rda")
+
 ids <- intersect(rownames(glioma_annotations), colnames(tcga.gbm.450k))
 
 # GBM data
@@ -91,7 +97,6 @@ GBM.PDL1.methylation.plots <- lapply(colnames(GBM.PDL1.methylation_expression[gr
 names(GBM.PDL1.methylation.plots) <- colnames(GBM.PDL1.methylation_expression[grep("cg", colnames(GBM.PDL1.methylation_expression))])
 
 # LGG data
-
 lgg.ids <- intersect(colnames(tcga.lgg.450k), rownames(glioma_annotations))
 lgg.ids <- intersect(lgg.ids, colnames(tcga_gliomas_rna_seq))
 LGG.PDL1.methylation_expression <- as.data.frame(cbind(IDH_status = as.character(glioma_annotations[lgg.ids,]$IDH.status),
@@ -104,6 +109,7 @@ for (i in colnames(LGG.PDL1.methylation_expression[grep("cg|CD", colnames(LGG.PD
   LGG.PDL1.methylation_expression[,i] <- as.numeric(as.character(LGG.PDL1.methylation_expression[,i]))
 }
 LGG.PDL1.methylation_expression$IDH_status <- relevel(LGG.PDL1.methylation_expression$IDH_status, ref = "WT")
+
 table(LGG.PDL1.methylation_expression$IDH_status, LGG.PDL1.methylation_expression$chr1p19q_status)
 lgg.idh_mut.codel <- which(LGG.PDL1.methylation_expression$IDH_status == "Mutant" & LGG.PDL1.methylation_expression$chr1p19q_status == "codel")
 lgg.idh_mut.non_codel <- which(LGG.PDL1.methylation_expression$IDH_status == "Mutant" & LGG.PDL1.methylation_expression$chr1p19q_status == "non-codel")
@@ -142,7 +148,7 @@ seqlevels(gr.annot450k.uscs) <- paste("chr", seqlevels(gr.annot450k.uscs), sep =
 geneSymbol <- "CD274"
 genome <- "hg19"
 annots <- c("hg19_cpgs", "hg19_cpg_shores", "hg19_cpg_shelves")
-annotations <- build_annotations(genome = genome, annotations = annots)
+annotations <- annotatr::build_annotations(genome = genome, annotations = annots)
 gr.data450k <- gr.annot450k.uscs[grep("CD274", gr.annot450k.uscs$UCSC_RefGene_Name)]
 strand(gr.data450k) <- "*"
 
@@ -153,19 +159,65 @@ class(LGGData) <- "numeric"
 
 methExpCorLGG <- sapply(colnames(LGG.PDL1.methylation_expression)[grep("cg", colnames(LGG.PDL1.methylation_expression))], function(x){
   IDHwt <- cor(as.numeric(LGG.PDL1.methylation_expression[, x]), 
-           as.numeric(LGG.PDL1.methylation_expression[, "CD274"]), 
+           log2(as.numeric(LGG.PDL1.methylation_expression[, "CD274"])+1), 
            method = "spearman")
 })
+
+# as per Monika's feedback, only plot top 2 negatively correlated probes
+pdf("TCGA_LGG_PDL1_methylation_expression_XY_plots_top2.pdf")
+par(mfrow = c(2,1))
+methExpXYPlotLGG <- sapply(names(sort(methExpCorLGG)[c(1,2)]), function(x){
+  c1 <- cor(as.numeric(LGG.PDL1.methylation_expression[, x]), 
+            log2(as.numeric(LGG.PDL1.methylation_expression[, "CD274"])+1), 
+            method = "spearman")
+  c1 <- round(c1, 2)
+  p1 <-plot(as.numeric(LGG.PDL1.methylation_expression[, x]), 
+            log2(as.numeric(LGG.PDL1.methylation_expression[, "CD274"])+1),
+            xlab = paste("Probe ID ", x, " [beta value]", sep = ""),
+            ylab = "PD-L1 [log2(FPKM+1)]",
+            xlim = c(0,1),
+            main = paste("Correlation ", c1, " [Spearman]", sep = ""),
+            pch = c(16, 17)[as.numeric(glioma_annotations[rownames(LGGData),]$IDH.status)],
+            col = c("red", "blue")[as.numeric(glioma_annotations[rownames(LGGData),]$IDH.status)])
+  legend("topright", legend = c("IDHmut", "WT"), col = c("red", "blue"), pch = c(16,17))
+  abline(lm(log2(as.numeric(LGG.PDL1.methylation_expression[, "CD274"])+1) ~ as.numeric(LGG.PDL1.methylation_expression[, x])), lwd = 2)
+  lines(lowess(log2(as.numeric(LGG.PDL1.methylation_expression[, "CD274"])+1) ~ as.numeric(LGG.PDL1.methylation_expression[, x])), col = "green", lwd = 2)
+})
+dev.off()
 
 GBMData <- GBM.PDL1.methylation_expression[, grep("cg", colnames(GBM.PDL1.methylation_expression))]
 GBMData <- as.matrix(GBMData)
 class(GBMData) <- "numeric"
 
+
+# calculating correlations for GBM data
 methExpCorGBM <- sapply(colnames(GBM.PDL1.methylation_expression)[grep("cg", colnames(GBM.PDL1.methylation_expression))], function(x){
   IDHwt <- cor(as.numeric(GBM.PDL1.methylation_expression[, x]), 
-               as.numeric(GBM.PDL1.methylation_expression[, "CD274"]), 
+               log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1), 
                method = "spearman")
 })
+
+# XY plots for GBM data
+pdf("TCGA_GBM_PDL1_methylation_expression_XY_plots.pdf")
+par(mfrow = c(3,2))
+methExpXYPlotLGG <- sapply(colnames(GBMData), function(x){
+  c1 <- cor(as.numeric(GBM.PDL1.methylation_expression[, x]), 
+            log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1),
+            method = "spearman")
+  c1 <- round(c1, 2)
+  p1 <-plot(as.numeric(GBM.PDL1.methylation_expression[, x]), 
+            log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1),
+            xlab = paste("Probe ID ", x, " [beta value]", sep = ""),
+            ylab = "PD-L1 [log2(FPKM+1)]",
+            xlim = c(0,1),
+            main = paste("Correlation ", c1, " [Spearman]", sep = ""),
+            pch = c(16, 17)[as.numeric(glioma_annotations[rownames(GBMData),]$IDH.status)],
+            col = c("red", "blue")[as.numeric(glioma_annotations[rownames(GBMData),]$IDH.status)])
+  legend("topright", legend = c("IDHmut", "WT"), col = c("red", "blue"), pch = c(16,17))
+  abline(lm(log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1) ~ as.numeric(GBM.PDL1.methylation_expression[, x])), lwd = 2)
+  lines(lowess(log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1) ~ as.numeric(GBM.PDL1.methylation_expression[, x])), col = "green", lwd = 2)
+})
+dev.off()
 
 
 # preparing Gviz tracks
@@ -199,13 +251,15 @@ LGGdata450kTrackByIDH <- DataTrack(gr.data450k,
                                 data = LGGData, 
                                 type = c("a"), 
                                 groups = LGG.PDL1.methylation_expression$IDH_status,
-                                name = "LGG\n[beta values]")
+                                name = "LGG\n[average beta values/group]")
 
-LGGdata450kTrackByGrade <- DataTrack(gr.data450k, 
-                                  data = LGGData, 
-                                  type = c("a"),
-                                  groups = LGG.PDL1.methylation_expression$grade,
-                                  name = "LGG\n[beta values]")
+gr.data450k.boxplots <- gr.data450k
+width(gr.data450k.boxplots) <- 100
+LGGdata450kTrackByIDHboxplot<- DataTrack(gr.data450k.boxplots, 
+                                   data = LGGData, 
+                                   type = c("boxplot"), 
+                                   groups = LGG.PDL1.methylation_expression$IDH_status,
+                                   name = "LGG\n[beta values]")
 
 LGGdataMethExpCor <- DataTrack(gr.data450k, 
                             data = methExpCorLGG,
@@ -220,12 +274,26 @@ plotTracks(list(gtrack,
                 cpgTrack, 
                 pos450kTrack, 
                 LGGdata450kTrackByIDH, 
-                LGGdata450kTrackByGrade,
                 LGGdataMethExpCor), 
-           extend.left = 2000, 
-           extend.right = 2000,
+           extend.left = 500, 
+           extend.right = 500,
            main = "PD-L1 Methylation - TCGA LGG Data")
 dev.off()
+
+pdf("~/Data/Collaborations/LGG_PDL1/Gviz_plot_PDL1_LGG_TSS_detail.pdf", paper = "a4r")
+plotTracks(list(gtrack, 
+                itrack,
+                biomTrack, 
+                cpgTrack, 
+                pos450kTrack, 
+                LGGdata450kTrackByIDH,
+                LGGdata450kTrackByIDHboxplot, 
+                LGGdataMethExpCor),
+           from = start(biomTrack@range)[1] - 800,
+           to = end(biomTrack@range)[1] + 500,
+           main = "PD-L1 Methylation\nTCGA LGG Data - TSS Detail")
+dev.off()
+
 
 # GBM
 # preparing data
@@ -235,6 +303,13 @@ GBMdata450kTrackByIDH <- DataTrack(gr.data450k,
                                 type = c("a"), 
                                 groups = GBM.PDL1.methylation_expression$IDH_status,
                                 name = "GBM\n[beta values]")
+
+GBMdata450kTrackByIDHboxplot <- DataTrack(gr.data450k.boxplots, 
+                                   data = GBMData, 
+                                   type = c("boxplot"), 
+                                   groups = GBM.PDL1.methylation_expression$IDH_status,
+                                   name = "GBM\n[beta values]")
+
 GBMdataMethExpCor <- DataTrack(gr.data450k, 
                             data = methExpCorGBM,
                             type = c("a"),
@@ -253,6 +328,20 @@ plotTracks(list(gtrack,
            extend.left = 2000, 
            extend.right = 2000,
            main = "PD-L1 Methylation - TCGA GBM Data")
+dev.off()
+
+pdf("~/Data/Collaborations/LGG_PDL1/Gviz_plot_PDL1_GBM_TSS_details.pdf", paper = "a4r")
+plotTracks(list(gtrack, 
+                itrack,
+                biomTrack, 
+                cpgTrack, 
+                pos450kTrack, 
+                GBMdata450kTrackByIDH,
+                GBMdata450kTrackByIDHboxplot,
+                GBMdataMethExpCor), 
+           from = start(biomTrack@range)[1] - 800,
+           to = end(biomTrack@range)[1] + 500,
+           main = "PD-L1 Methylation\nTCGA GBM Data - TSS Details")
 dev.off()
 levels(LGG.PDL1.methylation_expression$IDH_status)
 
