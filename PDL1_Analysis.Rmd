@@ -2,7 +2,7 @@
 title: 'Analysis: Expression levels of PD-L1 (CD274) in lower-grade gliomas (LGG -
   TCGA publicly available data)'
 author: "Sebastian Kurscheid"
-date: "23 January 2016"
+date: "04 November 2016"
 output:
   html_document:
     fontsize: 12
@@ -20,36 +20,30 @@ output:
 # Introduction
 Purpose of the analysis: Investigate differences in PD-L1 (CD274) expression levels betweeen molecular & pathohistological subgroups of lower grade gliomas (LGG) as well as glioblastoma tumors (GBM), using publicly available from The Canger Genome Atlas (TCGA).
 
-TCGA data for LGG and GBM samples has been downloaded between November 2015 and January 2016, and has been pre-processed to produce single data frames of expression valus for each dataset. Additionally, Pierre Bady ([link]pierre.bady@unil.ch) has compiled information about somatic mutations (incl. IDH1/2), CNV status, and CIMP status for the LGG dataset and kindly made these available to allow stratification of LGG samples.
-
+TCGA RNA-Seq Level 3 (normalised) data for LGG and GBM samples were obtained through the NCI GDC portal ([link]https://gdc-portal.nci.nih.gov), and was pre-processed to produce single data frames of expression values with sample annotations (sample type, IDH status, etc). based on supplementary tables 2 & 3 from Ceccarelli et al 2016.
 *********
 # Results
 ## Data preparation
 ```{r loading_external_data, cache=TRUE, tidy=TRUE, tidy.opts=(width.cutoff=50)}
-#----------  load the prepared clinical LGG data --------------
-load("~/Data/Collaborations/LGG_PDL1/clinpatient.rda")
-# some data re-formatting
-clinpatient$bcr_patient_barcode <- as(clinpatient$bcr_patient_barcode, "character")
+#----------  load the prepared sample annotations --------------
+load("~/Data/TCGA/GBM/Ceccarelli et al. 2016/glioma_annotations.rda")
+glioma_annotations$Case <- as.character(glioma_annotations$Case)
 
-#---------- load LGG RNA-Seq data from pre-processing step --------------
-# TCGA Level 3 RNA-Seq gene-level data was used, which is stored as FPKM (estimated fragments, normalized for transcript length)
-# this data has been log2 transformed with an offset of 1 to avoid -Inf and approximate normal distribution of the data
-load("~/Data/Collaborations/LGG_PDL1/lgg.rna_seq.norm.log2.rda")
+#---------- load TCGA glioma RNA-Seq data from pre-processing step --------------
+load("~/Data/Collaborations/LGG_PDL1/tcga_gliomas_rna_seq.rda")
+tcga_gliomas_rna_seq <- log2(tcga_gliomas_rna_seq + 1)
 
-#---------- load GBM RNA-Seq data from pre-processing step --------------
-# TCGA Level 3 RNA-Seq gene-level data was used, which is stored as FPKM (estimated fragments, normalized for transcript length)
-# this data has been log2 transformed with an offset of 1 to avoid -Inf and approximate normal distribution of the data
-load("~/Data/Collaborations/LGG_PDL1/gbm.rna_seq.norm.log2.rda")
+# select only samples which have expression and annotation data available
+i1 <- intersect(rownames(glioma_annotations), colnames(tcga_gliomas_rna_seq))
+glioma_annotations <- glioma_annotations[i1,]
+tcga_gliomas_rna_seq <- tcga_gliomas_rna_seq[,i1]
 ```
 
 Number of available samples for LGG and GBM, respectively
 
 ```{r sample_counts, tidy=TRUE, tidy.opts=(width.cutoff=50)}
-# LGG samples
-ncol(lgg.rna_seq.norm.log2)
+table(glioma_annotations$Study)
 
-# GBM samples
-ncol(gbm.rna_seq.norm.log2)
 ```
 
 *********
@@ -59,16 +53,17 @@ ncol(gbm.rna_seq.norm.log2)
 ```{r boxplot_pdl1_grade_2_3, tidy=TRUE, tidy.opts=(width.cutoff=50)}
 #-------------- Boxplot of PD-L1 expression levels, comparing LGG Grade II & III --------------
 # The EntrezID for PD-L1/CD274 is 29126
-PDL1 <- grep(29126, rownames(lgg.rna_seq.norm.log2))
-gradeII <- clinpatient[which(clinpatient$grade == 2), "bcr_patient_barcode"]
-gradeIII <- clinpatient[which(clinpatient$grade == 3), "bcr_patient_barcode"]
-boxplot(unlist(lgg.rna_seq.norm.log2[PDL1, gradeII]),
-        unlist(lgg.rna_seq.norm.log2[PDL1, gradeIII]),
+PDL1 <- grep(29126, rownames(tcga_gliomas_rna_seq))
+gradeII <- glioma_annotations[which(glioma_annotations$Grade == "G2"), "Case"]
+gradeIII <- glioma_annotations[which(glioma_annotations$Grade == "G3"), "Case"]
+boxplot(unlist(tcga_gliomas_rna_seq[PDL1, gradeII]),
+        unlist(tcga_gliomas_rna_seq[PDL1, gradeIII]),
         names = c(paste("Grade II\n[N =", length(gradeII), "]", sep = ""),
-                  paste("Grade III\n[N =", length(gradeIII), "]", sep = "")))
+                  paste("Grade III\n[N =", length(gradeIII), "]", sep = "")),
+        xlab = "PD-L1 expression [log2(FPKM + 1)]")
 # T-test to compare the two population means
-t.test(lgg.rna_seq.norm.log2[PDL1, gradeII], 
-       lgg.rna_seq.norm.log2[PDL1, gradeIII])
+t.test(tcga_gliomas_rna_seq[PDL1, gradeII], 
+       tcga_gliomas_rna_seq[PDL1, gradeIII])
 ```
 
 ### Conclusions
@@ -81,29 +76,26 @@ t.test(lgg.rna_seq.norm.log2[PDL1, gradeII],
 ### Data preparation
 ```{r pdl1_idh_mut_wt, tidy=TRUE, tidy.opts=(width.cutoff=50)}
 #-------------- collate PD-L1 expression levels and survival data for patients with known IDH1 status --------------
-IDHmut <- clinpatient[which(clinpatient$mIDHtot == 1), "bcr_patient_barcode"]
-IDHwt <- clinpatient[which(clinpatient$mIDHtot == 0), "bcr_patient_barcode"]
-IDHmut1p19qcodel <- clinpatient[which(clinpatient$mIDHtot == 1 & clinpatient$co1p19q == "cd"), "bcr_patient_barcode"]
-IDHmut1p19qnorm <- clinpatient[which(clinpatient$mIDHtot == 1 & clinpatient$co1p19q == "n"), "bcr_patient_barcode"]
-CIMPpos <- clinpatient[which(clinpatient$hCIMP == 1), "bcr_patient_barcode"]
-CIMPneg <- clinpatient[which(clinpatient$hCIMP == 0), "bcr_patient_barcode"]
-
-PDL1.IDHstatusKnownPatients  <- c(unlist(lgg.rna_seq.norm.log2[PDL1, IDHmut1p19qcodel]), 
-                                  unlist(lgg.rna_seq.norm.log2[PDL1, IDHmut1p19qnorm]),
-                                  unlist(lgg.rna_seq.norm.log2[PDL1, IDHwt]))
-PDL1.IDHstatusKnownPatients <- data.frame("PDL1exp" = PDL1.IDHstatusKnownPatients, 
-                                          "status" = c(rep("IDHmut1p19qcodel", length(IDHmut1p19qcodel)), 
-                                                       rep("IDHmut1p19qnorm", length(IDHmut1p19qnorm)),
-                                                       rep("IDHwt", length(IDHwt))),
-                                          "months_to_death" = clinpatient[c(IDHmut1p19qcodel, IDHmut1p19qnorm, IDHwt), "days_to_death"]/ 30)
-PDL1.IDHstatusKnownPatients$death <- 0
-PDL1.IDHstatusKnownPatients[!is.na(PDL1.IDHstatusKnownPatients$months_to_death), "death"] <- 1
+plotData <- as.data.frame(glioma_annotations[i1, c("Study", "IDH.status", "IDH.codel.subtype", "Supervised.DNA.Methylation.Cluster")])
+plotData <- cbind(plotData, as.numeric(tcga_gliomas_rna_seq[grep("CD274", rownames(tcga_gliomas_rna_seq)), i1]))
+colnames(plotData)[5] <- "PDL1"
+levels(plotData$Study) <- c("LGG", "GBM")
+plotData$combined <- NA 
+plotData[which(plotData$Study == "GBM" & plotData$IDH.codel.subtype == "IDHwt"),]$combined <- "GBM_IDHwt"
+plotData[which(plotData$Study == "GBM" & plotData$IDH.codel.subtype == "IDHmut-non-codel"),]$combined <- "GBM_IDHmut"
+plotData[which(plotData$Study == "LGG" & plotData$IDH.codel.subtype == "IDHwt"),]$combined <- "LGG_IDHwt"
+plotData[which(plotData$Study == "LGG" & plotData$IDH.codel.subtype == "IDHmut-non-codel"),]$combined <- "LGG_IDHmut_nonCoDel"
+plotData[which(plotData$Study == "LGG" & plotData$IDH.codel.subtype == "IDHmut-codel"),]$combined <- "LGG_IDHmut_coDel"
+plotData$combined <- as.factor(plotData$combined)
+plotData$combined2 <- as.character(plotData$combined)
+plotData[grep("GBM", plotData$combined2),]$combined2 <- "GBM"
+plotData$combined2 <- as.factor(plotData$combined2)
 ```
+
 ### Boxplot
 ```{r boxplot_pdl1_idh_mut_wt, tidy=TRUE, tidy.opts=(width.cutoff=50)}
 #-------------- PD-L1 expression levels, comparing IDH mut to wt, irrespective of grade --------------
-boxplot(PDL1.IDHstatusKnownPatients[IDHmut, "PDL1exp"],
-        PDL1.IDHstatusKnownPatients[IDHwt, "PDL1exp"],
+boxplot(plotData[which(plotData$Study == "LGG"),]$PDL1 ~ plotData[which(plotData$Study == "LGG"),]$IDH.status,
         axes = FALSE,
         frame = FALSE,
         lwd = 2.75,
@@ -111,21 +103,19 @@ boxplot(PDL1.IDHstatusKnownPatients[IDHmut, "PDL1exp"],
 
 axis(1, lwd = 2.75,
      at = c(1,2), 
-     labels = c(paste("IDH mut\n[N =", length(IDHmut), "]", sep = ""),
-                paste("IDH wt\n[N =", length(IDHwt), "]", sep = "")),
+     labels = c(paste("IDH mut\n[N = ", table(plotData[which(plotData$Study == "LGG"),]$IDH.status)[1], "]", sep = ""),
+                paste("IDH wt\n[N = ", table(plotData[which(plotData$Study == "LGG"),]$IDH.status)[2], "]", sep = "")),
      padj = 1)
 
 axis(2, lwd = 2.75)
 
-mtext(side = 2, "PD-L1 expression [log2 FPKM]", line = 2.5, cex = 1.25)
+mtext(side = 2, "PD-L1 expression [log2(FPKM + 1)]", line = 2.5, cex = 1.25)
 ```
 
 ### Statistical Test (t-Test)
-
 ```{r}
 # T-test to compare the two population means
-t.test(PDL1.IDHstatusKnownPatients[IDHmut, "PDL1exp"],
-       PDL1.IDHstatusKnownPatients[IDHwt, "PDL1exp"])
+t.test(plotData[which(plotData$Study == "LGG"),]$PDL1 ~ plotData[which(plotData$Study == "LGG"),]$IDH.status)
 
 ```
 ### Conclusions
@@ -138,17 +128,20 @@ t.test(PDL1.IDHstatusKnownPatients[IDHmut, "PDL1exp"],
 
 ```{r boxplot_cimp_pos_neg, tidy=TRUE, tidy.opts=(width.cutoff=50)}
 #-------------- PD-L1 expression levels, comparing CIMP pos to neg, irrespective of grade --------------
-boxplot(unlist(lgg.rna_seq.norm.log2[PDL1, CIMPpos]),
-        unlist(lgg.rna_seq.norm.log2[PDL1, CIMPneg]),
-        names = c("CIMP+", "CIMP-"))
+CIMPpos <- rownames(plotData[grep("CIMP", plotData$Supervised.DNA.Methylation.Cluster),])
+CIMPneg <- rownames(plotData[grep("CIMP", invert = T, plotData$Supervised.DNA.Methylation.Cluster),])
+boxplot(unlist(tcga_gliomas_rna_seq[PDL1, CIMPpos]),
+        unlist(tcga_gliomas_rna_seq[PDL1, CIMPneg]),
+        names = c("CIMP+", "CIMP-"),
+        xlab = "PD-L1 expression [log2(FPKM + 1)]")
 ```
 
 ### Statistical Test (t-Test)
 
 ```{r}
 # T-test to compare the two population means
-t.test(lgg.rna_seq.norm.log2[PDL1, CIMPpos], 
-       lgg.rna_seq.norm.log2[PDL1, CIMPneg])
+t.test(unlist(plotData[CIMPpos, "PDL1"]),
+        unlist(plotData[CIMPneg, "PDL1"]))
 
 ```
 ### Conclusions
@@ -162,13 +155,8 @@ t.test(lgg.rna_seq.norm.log2[PDL1, CIMPpos],
 
 ```{r boxplot_lgg_idh_mut_wt_1p19q_gbm, tidy=TRUE, tidy.opts=(width.cutoff=50)}
 #-------------- PD-L1 expression levels, comparing IDHmut/1p19qcodel to IDmut/1p19qn to IDHwt, including GBM  --------------
-tab1 <- PDL1.IDHstatusKnownPatients[, c("PDL1exp", "status")]
-tab2 <- data.frame("PDL1exp" = unlist(gbm.rna_seq.norm.log2[PDL1,]), "status" = rep("GBM", ncol(gbm.rna_seq.norm.log2)))
-tab1 <- rbind(tab1, tab2)
-tab1$status <- factor(as.character(tab1$status), levels = c("IDHmut1p19qcodel", "IDHmut1p19qnorm", "IDHwt", "GBM"))
-
-
-boxplot(tab1$PDL1exp ~ tab1$status,
+plotData$combined2 <- factor(as.character(plotData$combined2), levels = levels(plotData$combined2)[ c(2, 3, 4, 1)])
+boxplot(plotData$PDL1 ~ plotData$combined2,
         axes = FALSE,
         frame = FALSE,
         lwd = 2.75,
@@ -176,31 +164,31 @@ boxplot(tab1$PDL1exp ~ tab1$status,
 
 axis(1, lwd = 2.75,
      at = c(1,2,3,4), 
-     labels = c(paste("IDH mut,\n1p19q codel\n[N = ", length(IDHmut1p19qcodel),"]", sep = ""),
-                paste("IDH mut,\n1p19q norm\n[N = ", length(IDHmut1p19qnorm),"]", sep = ""),
-                paste("IDH wt\n[N = ", length(IDHwt), "]", sep = ""),
-                paste("GBM\n[N = ", ncol(gbm.rna_seq.norm.log2), "]", sep = "")),
+     labels = c(paste("IDH mut,\n1p19q codel\n[N = ", table(plotData$combined2)[1],"]", sep = ""),
+                paste("IDH mut,\n1p19q norm\n[N = ", table(plotData$combined2)[2],"]", sep = ""),
+                paste("IDH wt\n[N = ", table(plotData$combined2)[3], "]", sep = ""),
+                paste("GBM\n[N = ", table(plotData$combined2)[4], "]", sep = "")),
      padj = 1)
 axis(2, lwd = 2.75)
-mtext(side = 2, "PD-L1 expression [log2 FPKM]", line = 2.5, cex = 1.25)
+mtext(side = 2, "PD-L1 expression [log2(FPKM + 1)]", line = 2.5, cex = 1.25)
 ```
 
 ### Statistical Test (ANOVA)
 
 ```{r}
 # performing ANOVA to check if differences between groups are significant
-aov2 <- aov(formula = PDL1exp ~ status, data = tab1)
+aov2 <- aov(formula = PDL1 ~ combined2, data = plotData)
 # post-hoc analysis shows that they are
 
 TukeyHSD(aov2)
-bartlett.test(tab1$PDL1exp ~ tab1$status)
+bartlett.test(plotData$PDL1 ~ plotData$combined2)
 # but Bartlett test for homogeneity of variances shows that the assumption is violated
 # so the ANOVA has to be taken with a grain of salt
 # [possibly due to uneven sized groups? or because values are derived from count data?]
 ```
 ### Conclusions
 
-**These esults show that we observe statistically significant difference in PD-L1 expression levels between the three LGG sub-groups (IDH^mut^ & 1p19q co-del, IDH^mut^ & 1p19q normal, IDH^wt^), while there is no difference between LGG IDH^wt^ and GBM samples.***
+**These results show that we observe statistically significant difference in PD-L1 expression levels between the three LGG sub-groups (IDH^mut^ & 1p19q co-del, IDH^mut^ & 1p19q normal, IDH^wt^), while there is no difference between LGG IDH^wt^ and GBM samples.***
 
 *********
 
@@ -209,26 +197,25 @@ bartlett.test(tab1$PDL1exp ~ tab1$status)
 
 ```{r boxplot_lgg_cimp_1p19q_gbm, tidy=TRUE, tidy.opts=(width.cutoff=50)}
 #-------------- collate PD-L1 expression levels and survival data for patients with known CIMP status [more CIMP cases then known IDH1/2 status] --------------
-PDL1 <- grep(29126, rownames(lgg.rna_seq.norm.log2))
-CIMPpos1p19qcodel <- clinpatient[which(clinpatient$hCIMP == 1 & clinpatient$co1p19q == "cd"), "bcr_patient_barcode"]
-CIMPpos1p19qnorm <- clinpatient[which(clinpatient$hCIMP == 1 & clinpatient$co1p19q == "n"), "bcr_patient_barcode"]
-CIMPpos <- clinpatient[which(clinpatient$hCIMP == 1), "bcr_patient_barcode"]
-CIMPneg <- clinpatient[which(clinpatient$hCIMP == 0), "bcr_patient_barcode"]
+CIMPpos1p19qcodel <- which(plotData$Supervised.DNA.Methylation.Cluster %in% c("G-CIMP-high", "G-CIMP-low") & plotData$combined2 == "LGG_IDHmut_coDel")
+CIMPpos1p19qnorm <- glioma_annotations[which(glioma_annotations$hCIMP == 1 & glioma_annotations$co1p19q == "n"), "bcr_patient_barcode"]
+CIMPpos <- glioma_annotations[which(glioma_annotations$hCIMP == 1), "bcr_patient_barcode"]
+CIMPneg <- glioma_annotations[which(glioma_annotations$hCIMP == 0), "bcr_patient_barcode"]
 
-PDL1.CIMPstatusKnownPatients  <- c(unlist(lgg.rna_seq.norm.log2[PDL1, CIMPpos1p19qcodel]), 
-                                  unlist(lgg.rna_seq.norm.log2[PDL1, CIMPpos1p19qnorm]),
-                                  unlist(lgg.rna_seq.norm.log2[PDL1, CIMPneg]))
+PDL1.CIMPstatusKnownPatients  <- c(unlist(tcga_gliomas_rna_seq[PDL1, CIMPpos1p19qcodel]), 
+                                  unlist(tcga_gliomas_rna_seq[PDL1, CIMPpos1p19qnorm]),
+                                  unlist(tcga_gliomas_rna_seq[PDL1, CIMPneg]))
 PDL1.CIMPstatusKnownPatients <- data.frame("PDL1exp" = PDL1.CIMPstatusKnownPatients, 
                                           "status" = c(rep("CIMPpos1p19qcodel", length(CIMPpos1p19qcodel)), 
                                                        rep("CIMPpos1p19qnorm", length(CIMPpos1p19qnorm)),
                                                        rep("CIMPneg", length(CIMPneg))),
-                                          "months_to_death" = clinpatient[c(CIMPpos1p19qcodel, CIMPpos1p19qnorm, CIMPneg), "days_to_death"]/ 30)
+                                          "months_to_death" = glioma_annotations[c(CIMPpos1p19qcodel, CIMPpos1p19qnorm, CIMPneg), "days_to_death"]/ 30)
 PDL1.CIMPstatusKnownPatients$death <- 0
 PDL1.CIMPstatusKnownPatients[!is.na(PDL1.CIMPstatusKnownPatients$months_to_death), "death"] <- 1
 
 #-------------- PD-L1 expression levels, comparing CIMPpos/1p19qcodel to CIMPpos/1p19qn to CIMPneg, including GBM  --------------
 tab1 <- PDL1.CIMPstatusKnownPatients[, c("PDL1exp", "status")]
-tab2 <- data.frame("PDL1exp" = unlist(gbm.rna_seq.norm.log2[PDL1,]), "status" = rep("GBM", ncol(gbm.rna_seq.norm.log2)))
+tab2 <- data.frame("PDL1exp" = unlist(tcga_gliomas_rna_seq[PDL1,]), "status" = rep("GBM", ncol(tcga_gliomas_rna_seq)))
 tab1 <- rbind(tab1, tab2)
 tab1$status <- factor(as.character(tab1$status), levels = c("CIMPpos1p19qcodel", "CIMPpos1p19qnorm", "CIMPneg", "GBM"))
 
@@ -243,7 +230,7 @@ axis(1, lwd = 2.75,
      labels = c(paste("CIMP+,\n1p19q codel\n[N = ", length(CIMPpos1p19qcodel),"]", sep = ""),
                paste("CIMP+,\n1p19q norm\n[N = ", length(CIMPpos1p19qnorm),"]", sep = ""),
                paste("CIMP-\n[N = ", length(CIMPneg), "]", sep = ""),
-               paste("GBM\n[N = ", ncol(gbm.rna_seq.norm.log2), "]", sep = "")),
+               paste("GBM\n[N = ", ncol(tcga_gliomas_rna_seq), "]", sep = "")),
      padj = 1)
 axis(2, 
      lwd = 2.75)
@@ -295,7 +282,7 @@ path.rna_seq <- paste(path, "/RNASeqV2/UNC__IlluminaHiSeq_RNASeqV2/Level_3/", se
 
 # using normalized data
 # PD-L1 (CD274) Entrez gene ID: 29126
-PDL1 <- grep(29126, rownames(lgg.rna_seq.norm.log2))
+PDL1 <- grep(29126, rownames(tcga_gliomas_rna_seq))
 for (i in 1:length(lgg.rna_seq_files)){
   if (i == 1){
     temp <- read.table(paste(path.rna_seq, lgg.rna_seq_files[i], sep = ""), header = T, as.is = T, sep = "\t")
@@ -311,12 +298,12 @@ lgg.rna_seq.norm <- lgg.rna_seq.norm[,-1]
 colnames(lgg.rna_seq.norm) <- names(lgg.rna_seq_files)
 # save(lgg.rna_seq.norm, file = "~/Data/Collaborations/LGG_PDL1/lgg.rna_seq.rda")
 # we only retain data for patients with clinical data
-lgg.rna_seq.norm <- lgg.rna_seq.norm[,which(colnames(lgg.rna_seq.norm) %in% rownames(clinpatient))]
+lgg.rna_seq.norm <- lgg.rna_seq.norm[,which(colnames(lgg.rna_seq.norm) %in% rownames(glioma_annotations))]
 # log2 transformation of data, adding offset of 1 to avoid -Inf
-lgg.rna_seq.norm.log2 <- log2(lgg.rna_seq.norm + 1)
-# save(lgg.rna_seq.norm.log2, file = "~/Data/Collaborations/LGG_PDL1/lgg.rna_seq.norm.log2.rda")
+tcga_gliomas_rna_seq <- log2(lgg.rna_seq.norm + 1)
+# save(tcga_gliomas_rna_seq, file = "~/Data/Collaborations/LGG_PDL1/tcga_gliomas_rna_seq.rda")
 # PD-L1 expression levels:
-# summary(unlist(lgg.rna_seq.norm.log2[grep(29126, rownames(lgg.rna_seq.norm.log2)),]))
+# summary(unlist(tcga_gliomas_rna_seq[grep(29126, rownames(tcga_gliomas_rna_seq)),]))
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
 # 0.000   2.830   3.674   3.660   4.358   8.285
 # human PD-L1 (CD274, EntrezID: 29126) is located on chr 9p24
@@ -356,10 +343,10 @@ colnames(gbm.rna_seq.norm) <- names(gbm.rna_seq_files)
 # save(lgg.rna_seq.norm, file = "~/Data/Collaborations/LGG_PDL1/lgg.rna_seq.rda")
 # we only retain data for patients with clinical data
 # log2 transformation of data, adding offset of 1 to avoid -Inf
-gbm.rna_seq.norm.log2 <- log2(gbm.rna_seq.norm + 1)
-# save(lgg.rna_seq.norm.log2, file = "~/Data/Collaborations/LGG_PDL1/lgg.rna_seq.norm.log2.rda")
+tcga_gliomas_rna_seq <- log2(gbm.rna_seq.norm + 1)
+# save(tcga_gliomas_rna_seq, file = "~/Data/Collaborations/LGG_PDL1/tcga_gliomas_rna_seq.rda")
 # PD-L1 expression levels:
-# summary(unlist(lgg.rna_seq.norm.log2[grep(29126, rownames(lgg.rna_seq.norm.log2)),]))
+# summary(unlist(tcga_gliomas_rna_seq[grep(29126, rownames(tcga_gliomas_rna_seq)),]))
 # Min. 1st Qu.  Median    Mean 3rd Qu.    Max. 
 # 0.000   2.830   3.674   3.660   4.358   8.285
 # human PD-L1 (CD274, EntrezID: 29126) is located on chr 9p24
