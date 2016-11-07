@@ -74,7 +74,7 @@ rownames(tcga_gliomas_rna_seq) <- tcga_gliomas_rna_seq[,1]
 tcga_gliomas_rna_seq <- tcga_gliomas_rna_seq[, grep("normalized_count", colnames(tcga_gliomas_rna_seq))]
 colnames(tcga_gliomas_rna_seq) <- unlist(lapply(strsplit(colnames(tcga_gliomas_rna_seq), "\\."), function(x) x[1]))
 #save(tcga_gliomas_rna_seq, file = "R_Analysis/tcga_gliomas_rna_seq.rda")
-load("/Users/u1001407/Data/Collaborations/LGG_PDL1/tcga_gliomas_rna_seq.rda")
+load("~/Data/Collaborations/LGG_PDL1/tcga_gliomas_rna_seq.rda")
 
 # actual expression analysis ----------------------------------------------
 i1 <- intersect(glioma_annotations$Case, colnames(tcga_gliomas_rna_seq))
@@ -114,8 +114,6 @@ boxplot(unlist(gbm_expression[grep("CD274", rownames(gbm_expression)), rownames(
 dev.off()
 t.test(unlist(gbm_expression[grep("CD274", rownames(gbm_expression)), rownames(gbm_annotations[which(gbm_annotations$Original.Subtype != "G-CIMP"),])]),
        unlist(gbm_expression[grep("CD274", rownames(gbm_expression)), rownames(gbm_annotations[which(gbm_annotations$Original.Subtype == "G-CIMP"),])]))
-
-
 
 # load TCGA GBM Agilent Level 3 data --------------------------------------
 setwd("~/Data/TCGA/GBM/Agilent")
