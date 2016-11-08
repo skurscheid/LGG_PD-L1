@@ -21,17 +21,18 @@ output:
 Purpose of the analysis: Investigate differences in PD-L1 (CD274) expression levels betweeen molecular & pathohistological subgroups of lower grade gliomas (LGG) as well as glioblastoma tumors (GBM), using publicly available from The Canger Genome Atlas (TCGA).
 
 TCGA RNA-Seq Level 3 (normalised) data for LGG and GBM samples were obtained through the [NCI GDC portal](https://gdc-portal.nci.nih.gov), and was pre-processed to produce single data frames of expression values with sample annotations (sample type, IDH status, etc). based on supplementary tables 2 & 3 from Ceccarelli et al 2016.
+
 *********
 
 # Results
 
 ## Data preparation
-```{r loading_external_data, cache=TRUE, tidy=TRUE, tidy.opts=(width.cutoff=50)}
-#----------  load the prepared sample annotations --------------
+```{r loading_external_data, cache=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
+#-- load the prepared sample annotations --------------
 load("~/Data/TCGA/GBM/Ceccarelli et al. 2016/glioma_annotations.rda")
 glioma_annotations$Case <- as.character(glioma_annotations$Case)
 
-#---------- load TCGA glioma RNA-Seq data from pre-processing step --------------
+#-- load TCGA glioma RNA-Seq data from pre-processing step --------------
 load("~/Data/Collaborations/LGG_PDL1/tcga_gliomas_rna_seq.rda")
 tcga_gliomas_rna_seq <- log2(tcga_gliomas_rna_seq + 1)
 
@@ -43,15 +44,15 @@ tcga_gliomas_rna_seq <- tcga_gliomas_rna_seq[,i1]
 
 Number of available samples for LGG and GBM, respectively
 
-```{r sample_counts, tidy=TRUE, tidy.opts=(width.cutoff=50)}
+```{r sample_counts, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
 table(glioma_annotations$Study)
 
 ```
 
 *********
 ### Data preparation
-```{r pdl1_idh_mut_wt, tidy=TRUE, tidy.opts=(width.cutoff=50)}
-#-------------- collate PD-L1 expression levels and survival data for patients with known IDH1 status --------------
+```{r pdl1_idh_mut_wt, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
+#-- collate PD-L1 expression levels and tumor annotation data
 plotData <- as.data.frame(glioma_annotations[i1, c("Study", "Grade","IDH.status", "IDH.codel.subtype", "Supervised.DNA.Methylation.Cluster")])
 plotData <- cbind(plotData, as.numeric(tcga_gliomas_rna_seq[grep("CD274", rownames(tcga_gliomas_rna_seq)), i1]))
 colnames(plotData)[6] <- "PDL1"
@@ -71,8 +72,9 @@ LGGs <- which(plotData$Study == "LGG")
 
 ## Comparing PD-L1 expression between Grade II and III samples:
 ### Boxplot
-```{r boxplot_pdl1_grade_2_3, tidy=TRUE, tidy.opts=(width.cutoff=50)}
-#-------------- Boxplot of PD-L1 expression levels, comparing LGG Grade II & III --------------
+```{r boxplot_pdl1_grade_2_3, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
+#-- Boxplot of PD-L1 expression levels
+#-- comparing LGG Grade II & III
 # The EntrezID for PD-L1/CD274 is 29126
 PDL1 <- grep(29126, rownames(tcga_gliomas_rna_seq))
 boxplot(plotData[LGGs,]$PDL1 ~ droplevels(plotData[LGGs,]$Grade),
@@ -94,8 +96,8 @@ mtext(side = 2, "PD-L1 expression [log2(FPKM + 1)]", line = 2.5, cex = 1.25)
 ```
 
 ### Statistical Test (t-Test)
-```{r}
-# T-test to compare the two population means
+```{r t_test_Grade, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
+#-- T-test to compare the two population means
 t.test(plotData[LGGs,]$PDL1 ~ droplevels(plotData[LGGs,]$Grade))
 ```
 
@@ -108,8 +110,9 @@ t.test(plotData[LGGs,]$PDL1 ~ droplevels(plotData[LGGs,]$Grade))
 
 
 ### Boxplot
-```{r boxplot_pdl1_idh_mut_wt, tidy=TRUE, tidy.opts=(width.cutoff=50)}
-#-------------- PD-L1 expression levels, comparing IDH mut to wt, irrespective of grade --------------
+```{r boxplot_pdl1_idh_mut_wt, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
+#-- PD-L1 expression levels
+#-- comparing IDH mut to wt, irrespective of grade --------------
 boxplot(plotData[which(plotData$Study == "LGG"),]$PDL1 ~ plotData[which(plotData$Study == "LGG"),]$IDH.status,
         axes = FALSE,
         frame = FALSE,
@@ -129,8 +132,8 @@ mtext(side = 2, "PD-L1 expression [log2(FPKM + 1)]", line = 2.5, cex = 1.25)
 ```
 
 ### Statistical Test (t-Test)
-```{r}
-# T-test to compare the two population means
+```{r t_test_IDH, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
+#-- T-test to compare the two population means
 t.test(plotData[which(plotData$Study == "LGG"),]$PDL1 ~ plotData[which(plotData$Study == "LGG"),]$IDH.status)
 
 ```
@@ -141,8 +144,9 @@ t.test(plotData[which(plotData$Study == "LGG"),]$PDL1 ~ plotData[which(plotData$
 ## Comparing LGG samples stratified by IDH and 1p19q status to GBM
 ### Boxplot
 
-```{r boxplot_lgg_idh_mut_wt_1p19q_gbm, tidy=TRUE, tidy.opts=(width.cutoff=50)}
-#-------------- PD-L1 expression levels, comparing IDHmut/1p19qcodel to IDmut/1p19qn to IDHwt, including GBM  --------------
+```{r boxplot_lgg_idh_mut_wt_1p19q_gbm, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
+#-- PD-L1 expression levels, 
+#-- comparing IDHmut/1p19qcodel to IDmut/1p19qn to IDHwt, including GBM
 plotData$combined2 <- factor(as.character(plotData$combined2), levels = levels(plotData$combined2)[ c(2, 3, 4, 1)])
 x <- boxplot(plotData$PDL1 ~ plotData$combined2,
         axes = FALSE,
@@ -163,11 +167,10 @@ mtext(side = 2, "PD-L1 expression [log2(FPKM + 1)]", line = 2.5, cex = 1.25)
 
 ### Statistical Test (ANOVA)
 
-```{r}
-# performing ANOVA to check if differences between groups are significant
+```{r anova_idh_1p19q_gbm, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
+#-- performing ANOVA to check if differences between groups are significant
 aov2 <- aov(formula = PDL1 ~ combined2, data = plotData)
 # post-hoc analysis shows that they are
-
 TukeyHSD(aov2)
 bartlett.test(plotData$PDL1 ~ plotData$combined2)
 # but Bartlett test for homogeneity of variances shows that the assumption is violated
