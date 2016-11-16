@@ -9,3 +9,6 @@ PDL1_Analysis_cache/*
 *.png
 PDL1_Analysis.html
 PDL1_Analysis.pdf
+._.DS_Store
+._PDL1_Analysis.pdf
+Rplot.pdf
