@@ -1,8 +1,9 @@
 ---
-title: 'Analysis: Expression levels of PD-L1 (CD274) in lower-grade gliomas (LGG -
-  TCGA publicly available data)'
-author: "Sebastian Kurscheid"
-date: "04 November 2016"
+title: 'Analysis of expression levels of PD-L1 (CD274) in lower-grade gliomas and
+  glioblastomas and correlation with PD-L1 promoter methylation (LGG & GBM - TCGA
+  publicly available data) '
+author: "Sebastian Kurscheid, PhD (sebastian.kurscheid@anu.edu.au)"
+date: '`r format(Sys.Date(), "%B %d, %Y")`'
 output:
   pdf_document:
     number_sections: yes
@@ -26,87 +27,22 @@ Purpose of the analysis: Investigate differences in PD-L1 (CD274) expression lev
 TCGA RNA-Seq Level 3 (normalised) data for LGG and GBM samples were obtained through the [NCI GDC portal](https://gdc-portal.nci.nih.gov), and was pre-processed to produce single data frames of expression values with sample annotations (sample type, IDH status, etc). based on supplementary tables 2 & 3 from Ceccarelli et al 2016. For the PD-L1 expression analysis, TCGA GBM and LGG samples were selected for which RNA-Seq data and annotation information were available. For the correlation analysis of PD-L1 expression and promoter CGI CpG methylation levels, a smaller subset of samples was selected due to missigness of GBM samples which have both RNA-Seq and Infinium450k data available.
 
 All pairwise comparisons with two groups were performed using Student's T-Test.
-Comparisons with more than two group were compares using ANOVA, with pairwise comparisons performed using Tukey's HSD post-hoc analysis. P-values < 0.5 were considered as statistically significant.
+Comparisons with more than two group were compares using ANOVA, with pairwise comparisons performed using Tukey's HSD post-hoc analysis. P-values < 0.05 were considered as statistically significant.
 
 *********
 # Results
-
-## Data preparation
-```{r loading_external_data, cache=TRUE, tidy=TRUE, tidy.opts=list(width.cutoff=50), echo = FALSE, cache.lazy=FALSE}
-require(GenomicRanges)
-#-- load the prepared sample annotations --------------
-load("~/Data/TCGA/GBM/Ceccarelli_et_al._2016/glioma_annotations.rda")
-glioma_annotations$Case <- as.character(glioma_annotations$Case)
-
-#-- load TCGA glioma RNA-Seq data from pre-processing step --------------
-load("~/Data/Collaborations/LGG_PDL1/tcga_gliomas_rna_seq.rda")
-tcga_gliomas_rna_seq <- log2(tcga_gliomas_rna_seq + 1)
-
-#-- load 450k methylation and annotation data from pre-processing step --------------
-load("~/Data/References/Annotations/Platforms/gr.annot450k.rda")
-load("~/Data/TCGA/GBM/Infinium450k/tcga.gbm.450k.rda")
-load("~/Data/Collaborations/LGG_PDL1/tcga.lgg.450k.rda")
-tcga_gliomas_450k <- merge(tcga.lgg.450k, tcga.gbm.450k, by.x = "row.names", by.y = "row.names")
-
-# select only samples which have expression and annotation data available
-exp_samples <- intersect(rownames(glioma_annotations), colnames(tcga_gliomas_rna_seq))
-meth_samples <- intersect(rownames(glioma_annotations), colnames(tcga_gliomas_450k))
-exp_meth_samples <- intersect(exp_samples, meth_samples)
-tcga_gliomas_rna_seq <- tcga_gliomas_rna_seq[,exp_samples]
-tcga_gliomas_450k <- tcga_gliomas_450k[,meth_samples]
-```
-
-Number of available samples for LGG and GBM with expression (RNA-Seq) data, respectively
-
-```{r sample_counts_exp, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
-# number of samples with expression data
-table(glioma_annotations[exp_samples, ]$Study)
-
-```
-Number of available samples for LGG and GBM with methylation (450k) data, respectively
-
-```{r sample_counts_meth, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
-# number of samples with methylation data
-table(glioma_annotations[meth_samples, ]$Study)
-
-```
-Number of available samples for LGG and GBM with methylation (450k) and expression (RNA-Seq) data, respectively
-
-```{r sample_counts_meth_exp, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
-# number of samples with expression and methylation data
-table(glioma_annotations[exp_meth_samples, ]$Study)
-
-```
-*********
 ### Data preparation
-```{r pdl1_idh_mut_wt, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
-#-- collate PD-L1 expression levels and tumor annotation data
-load(""~/Data/Collaborations/LGG_PDL1/plotData.rda"")
-plotData <- as.data.frame(glioma_annotations[exp_samples, c("Study", "Grade","IDH.status", "IDH.codel.subtype", "Supervised.DNA.Methylation.Cluster")])
-plotData <- cbind(plotData, as.numeric(tcga_gliomas_rna_seq[grep("CD274", rownames(tcga_gliomas_rna_seq)), exp_samples]))
-colnames(plotData)[6] <- "PDL1"
-levels(plotData$Study) <- c("LGG", "GBM")
-plotData$combined <- NA 
-plotData[which(plotData$Study == "GBM" & plotData$IDH.codel.subtype == "IDHwt"),]$combined <- "GBM_IDHwt"
-plotData[which(plotData$Study == "GBM" & plotData$IDH.codel.subtype == "IDHmut-non-codel"),]$combined <- "GBM_IDHmut"
-plotData[which(plotData$Study == "LGG" & plotData$IDH.codel.subtype == "IDHwt"),]$combined <- "LGG_IDHwt"
-plotData[which(plotData$Study == "LGG" & plotData$IDH.codel.subtype == "IDHmut-non-codel"),]$combined <- "LGG_IDHmut_nonCoDel"
-plotData[which(plotData$Study == "LGG" & plotData$IDH.codel.subtype == "IDHmut-codel"),]$combined <- "LGG_IDHmut_coDel"
-plotData$combined <- as.factor(plotData$combined)
-plotData$combined2 <- as.character(plotData$combined)
-plotData[grep("GBM", plotData$combined2),]$combined2 <- "GBM"
-plotData$combined2 <- as.factor(plotData$combined2)
-LGGs <- which(plotData$Study == "LGG")
-```
 
 ## Comparing PD-L1 expression between Grade II and III samples:
 ### Boxplot
+```{r load_plotData, echo = F, eval = T}
+load("~/Data/Collaborations/LGG_PDL1/plotData.rda")
+```
+
 ```{r boxplot_pdl1_grade_2_3, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
 #-- Boxplot of PD-L1 expression levels
 #-- comparing LGG Grade II & III
-# The EntrezID for PD-L1/CD274 is 29126
-PDL1 <- grep(29126, rownames(tcga_gliomas_rna_seq))
-boxplot(plotData[LGGs,]$PDL1 ~ droplevels(plotData[LGGs,]$Grade),
+boxplot(plotData[which(plotData$Study == "LGG"),]$PDL1 ~ droplevels(plotData[which(plotData$Study == "LGG"),,]$Grade),
         axes = FALSE,
         frame = FALSE,
         lwd = 2.75,
@@ -118,6 +54,16 @@ axis(1, lwd = 2.75,
                 paste("Grade III\n[N = ", table(droplevels(plotData$Grade))[2], "]", sep = "")),
      padj = 1,
      cex = 3)
+# first horizontal significance bar
+p.size <- 2.5
+x1 <- 1.1
+x2 <- x1 + 0.8
+y1 <- 9.5
+y_offset <- -0.3
+lines(c(x1, x2), c(y1, y1), lwd = 2)
+lines(c(x1, x1), c(y1, y1 + y_offset), lwd = 2)
+lines(c(x2, x2), c(y1, y1 + y_offset), lwd = 2)
+points(1.5, y1 + 0.3, pch = "*", cex = p.size)
 
 axis(2, lwd = 2.75)
 mtext(side = 2, "PD-L1 expression [log2(FPKM + 1)]", line = 2.5, cex = 1)
@@ -127,7 +73,7 @@ mtext(side = 2, "PD-L1 expression [log2(FPKM + 1)]", line = 2.5, cex = 1)
 ### Statistical Test (t-Test)
 ```{r t_test_Grade, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
 #-- T-test to compare the two population means
-t.test(plotData[LGGs,]$PDL1 ~ droplevels(plotData[LGGs,]$Grade))
+t.test(plotData[which(plotData$Study == "LGG"),]$PDL1 ~ droplevels(plotData[which(plotData$Study == "LGG"),]$Grade))
 ```
 
 ### Conclusions
@@ -137,8 +83,8 @@ t.test(plotData[LGGs,]$PDL1 ~ droplevels(plotData[LGGs,]$Grade))
 
 ## Comparing LGG samples stratified by IDH1/2 mutation status
 
-
 ### Boxplot
+
 ```{r boxplot_pdl1_idh_mut_wt, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
 #-- PD-L1 expression levels
 #-- comparing IDH mut to wt, irrespective of grade --------------
@@ -154,8 +100,17 @@ axis(1, lwd = 2.75,
                 paste("IDH wt\n[N = ", table(plotData[which(plotData$Study == "LGG"),]$IDH.status)[2], "]", sep = "")),
      padj = 1,
      cex = 3)
-
 axis(2, lwd = 2.75)
+# first horizontal significance bar
+p.size <- 2.5
+x1 <- 1.1
+x2 <- x1 + 0.8
+y1 <- 9.5
+y_offset <- -0.3
+lines(c(x1, x2), c(y1, y1), lwd = 2)
+lines(c(x1, x1), c(y1, y1 + y_offset), lwd = 2)
+lines(c(x2, x2), c(y1, y1 + y_offset), lwd = 2)
+points(1.5, y1 + 0.3, pch = "*", cex = p.size)
 
 mtext(side = 2, "PD-L1 expression [log2(FPKM + 1)]", line = 2.5, cex = 1)
 ```
@@ -173,26 +128,73 @@ t.test(plotData[which(plotData$Study == "LGG"),]$PDL1 ~ plotData[which(plotData$
 ## Comparing LGG samples stratified by IDH and 1p19q status to GBM
 ### Boxplot
 
-```{r boxplot_lgg_idh_mut_wt_1p19q_gbm, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
-# ToDo : significance indication with horizontal bars
-#-- PD-L1 expression levels, 
-#-- comparing IDHmut/1p19qcodel to IDmut/1p19qn to IDHwt, including GBM
-plotData$combined2 <- factor(as.character(plotData$combined2), levels = levels(plotData$combined2)[ c(2, 3, 4, 1)])
+```{r boxplot_lgg_idh_mut_wt_1p19q_gbm, tidy=TRUE, tidy.opts=list(width.cutoff=60)}
+# points size
+p.size <- 2
 x <- boxplot(plotData$PDL1 ~ plotData$combined2,
-        axes = FALSE,
-        frame = FALSE,
-        lwd = 2.75,
-        ylim = c(0,10))
-
+             axes = FALSE,
+             frame = FALSE,
+             lwd = 2,
+             ylim = c(0,12))
 axis(1, lwd = 2.75,
      at = c(1,2,3,4), 
-     labels = c(paste("IDH mut,\n1p19q codel\n[N = ", table(plotData$combined2)[1],"]", sep = ""),
-                paste("IDH mut,\n1p19q non-codel\n[N = ", table(plotData$combined2)[2],"]", sep = ""),
+     labels = c(paste("IDH mut,\n1p19q\ncodel\n[N = ", table(plotData$combined2)[1],"]", sep = ""),
+                paste("IDH mut,\n1p19q\nnon-codel\n[N = ", table(plotData$combined2)[2],"]", sep = ""),
                 paste("IDH wt\n[N = ", table(plotData$combined2)[3], "]", sep = ""),
                 paste("GBM\n[N = ", table(plotData$combined2)[4], "]", sep = "")),
-     padj = 1)
+     padj = 0.7,
+     cex = 0.8)
 axis(2, lwd = 2.75)
+# first horizontal significance bar (LGG IDHmut nonCodel - LGG IDHmut_coDel, p < 0.001)
+x1 <- 1.1
+x2 <- x1 + 0.8
+y1 <- 9
+y_offset <- -0.3
+lines(c(x1, x2), c(y1, y1), lwd = 2)
+lines(c(x1, x1), c(y1, y1 + y_offset), lwd = 2)
+lines(c(x2, x2), c(y1, y1 + y_offset), lwd = 2)
+points(1.5, y1 + 0.3, pch = "*", cex = p.size)
+
+# second horizontal significance bar (LGG IDHwt - LGG IDHmut_coDel, p << 0.001)
+x3 <- x1 + 1.8
+y2 <- y1 + 0.7
+lines(c(x1, x3), c(y2, y2), lwd = 2)
+lines(c(x1, x1), c(y2, y2 + y_offset), lwd = 2)
+lines(c(x3, x3), c(y2, y2 + y_offset), lwd = 2)
+points(2, y2 + 0.3, pch = "*", cex = p.size)
+
+# third bar GBM-LGG_IDHmut_coDel (p << 0.001)
+x4 <- x1 + 2.8
+y3 <- y2 + 0.7
+lines(c(x1, x4), c(y3, y3), lwd = 2)
+lines(c(x1, x1), c(y3, y3 + y_offset), lwd = 2)
+lines(c(x4, x4), c(y3, y3 + y_offset), lwd = 2)
+points(2.5, y3 + 0.3, pch = "*", cex = p.size)
+
+# fourth bar LGG_IDHwt-LGG_IDHmut_nonCoDel (p << 0.001)
+lines(c(x2 + 0.2, x3), c(y1,y1), lwd = 2)
+lines(c(x2 + 0.2, x2 + 0.2), c(y1, y1 + y_offset), lwd = 2)
+lines(c(x3, x3), c(y1, y1 + y_offset), lwd = 2)
+points(2.5, y1 + 0.3, pch = "*", cex = p.size)
+
+# GBM-LGG_IDHmut_nonCoDel (p << 0.001)
+y4 <- y3 + 0.7
+lines(c(x2 + 0.2, x4), c(y4, y4), lwd = 2)
+lines(c(x2 + 0.2, x2 + 0.2), c(y4, y4 + y_offset), lwd = 2)
+lines(c(x4, x4), c(y4, y4 + y_offset), lwd = 2)
+points(3, y4 + 0.33, pch = "*", cex = p.size)
+
+# GBM-LGG_IDHwt                        0.3671533 -0.07451495 0.8088215 0.1412905
+y4 <- y3 + 0.7
+lines(c(x3 + 0.2, x4), c(y2, y2), lwd = 2)
+lines(c(x3 + 0.2, x3 + 0.2), c(y2, y2 + y_offset), lwd = 2)
+lines(c(x4, x4), c(y2, y2 + y_offset), lwd = 2)
+text(3.5, y2 + 0.33, "N.S.", cex = 0.7)
+
+# y axis label
 mtext(side = 2, "PD-L1 expression [log2(FPKM + 1)]", line = 2.5, cex = 1)
+
+
 ```
 
 ### Statistical Test (ANOVA)
@@ -213,20 +215,293 @@ bartlett.test(plotData$PDL1 ~ plotData$combined2)
 
 *********
 ## Correlation between PD-L1 promoter CGI CpG methylation and PD-L1 differences
+### LGG
+#### XY Plots of PD-L1 expression and DNA methylation (top 2 CpGs) for LGG
+```{r LGG_PDL1_methylation_expression_correlation, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
+load("~/Data/Collaborations/LGG_PDL1/LGG.PDL1.methylation_expression.rda")
+# re-organize the levels
+LGG.PDL1.methylation_expression$molecular_subtype <- factor(as.character(LGG.PDL1.methylation_expression$molecular_subtype), 
+                                                            levels = levels(LGG.PDL1.methylation_expression$molecular_subtype)[c(1,3,2)])
+
+
+# preparing data
+LGGData <- LGG.PDL1.methylation_expression[, grep("cg", colnames(LGG.PDL1.methylation_expression))]
+LGGData <- as.matrix(LGGData)
+class(LGGData) <- "numeric"
+
+methExpCorLGG <- sapply(colnames(LGG.PDL1.methylation_expression)[grep("cg", colnames(LGG.PDL1.methylation_expression))], function(x){
+  IDHwt <- cor(as.numeric(LGG.PDL1.methylation_expression[, x]), 
+           as.numeric(LGG.PDL1.methylation_expression[, "PDL1"]), 
+           method = "spearman")
+})
+
+#par(mfrow = c(2,1))
+nWT <- table(LGG.PDL1.methylation_expression$molecular_subtype)[1]
+nMT1p19qcodel <- table(LGG.PDL1.methylation_expression$molecular_subtype)[2]
+nMT1p19qnoncodel <- table(LGG.PDL1.methylation_expression$molecular_subtype)[3]
+
+methExpXYPlotLGG <- sapply(names(sort(methExpCorLGG)[c(1,2)]), function(x){
+  c1 <- cor.test(as.numeric(LGG.PDL1.methylation_expression[, x]), 
+            as.numeric(LGG.PDL1.methylation_expression[, "PDL1"]), 
+            method = "spearman",
+            exact = F)
+  cp1 <- c1$p.value
+  if (round(cp1, 2)  < 0.01) {
+    pval_text <- "p-value < 0.01"
+  } else {
+    pval_text <- paste("p-value = ", round(cp1, 2), sep = "" )
+  }
+  c1 <- round(c1$estimate, 2)
+  plot_point_symbols <- c(16, 17, 17) # dot, triangle, triangle
+  plot_point_colors <- c("blue", "red", "darkgrey")
+  p1 <-plot(as.numeric(LGG.PDL1.methylation_expression[, x]), 
+            as.numeric(LGG.PDL1.methylation_expression[, "PDL1"]),
+            xlab = paste("Methylation ", x, " [beta value]", sep = ""),
+            ylab = "PD-L1 [log2(FPKM+1)]",
+            xlim = c(0,1),
+            ylim = c(0,11),
+            main = paste("TCGA LGG Correlation ", c1, " [Spearman]\n",pval_text, sep = ""),
+            pch = plot_point_symbols[as.numeric(LGG.PDL1.methylation_expression$molecular_subtype)],
+            col = plot_point_colors[as.numeric(LGG.PDL1.methylation_expression$molecular_subtype)], 
+            frame.plot = F)
+  legend(x = 0,
+         y = 10.9,
+         legend = c(paste("IDHwt [N= ",nWT,"]", sep = ""),
+                    paste("IDHmut 1p19q codel [N= ",nMT1p19qcodel,"]", sep = ""), 
+                    paste("IDHmut 1p19q non-codel [N= ",nMT1p19qnoncodel,"]", sep = "")),
+         col = plot_point_colors, pch = c(16,17,17),
+         cex = 0.8, bty = "n")
+  abline(lm(as.numeric(LGG.PDL1.methylation_expression[, "PDL1"]) ~ as.numeric(LGG.PDL1.methylation_expression[, x])), lwd = 2)
+  lines(lowess(as.numeric(LGG.PDL1.methylation_expression[, "PDL1"]) ~ as.numeric(LGG.PDL1.methylation_expression[, x])), col = "green", lwd = 2)
+})
+
+```
+#### Boxplots comparing DNA methylation levels of the top two probes between LGG IDH wt and mut
+
+```{r LGG_PDL1_methylation_boxplots, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
+PDL1MethylationBoxPlotLGG <- sapply(names(sort(methExpCorLGG)[c(1,2)]), function(x){
+
+  # modified to use ANOVA instead of Student's t-test as we are looking at the molecular subtypes including 1p19q status, i.e. three groups  
+  aov3 <- aov(LGG.PDL1.methylation_expression[,x] ~ LGG.PDL1.methylation_expression[,"molecular_subtype"])
+  t1 <- TukeyHSD(aov3)
+  print(t1)
+  # t1 <- t.test(LGG.PDL1.methylation_expression[,x] ~ LGG.PDL1.methylation_expression[,"IDH_status"])
+  #   if (round(t1$p.value, 2)  < 0.01) {
+  #   pval_text <- "p-value < 0.01"
+  # } else {
+  #   pval_text <- paste("p-value = ", round(t1$p.value, 2), sep = "" )
+  # }
+  # 
+  
+  
+  
+  p1 <- boxplot(LGG.PDL1.methylation_expression[,x] ~ LGG.PDL1.methylation_expression[,"molecular_subtype"],
+                axes = FALSE,
+                frame = FALSE,
+                lwd = 2,
+                ylim = c(0,1.3),
+                main = paste("450k probe ", x, " [beta value]\n", sep = ""))
+                #main = paste("450k probe ", x, " [beta value]\n", pval_text, sep = ""))
+  axis(1, lwd = 2.75,
+     at = c(1,2,3), 
+     labels = c(paste("IDHwt\n[N= ",nWT,"]", sep = ""),
+                paste("IDHmut\n1p19q codel\n[N= ",nMT1p19qcodel,"]", sep = ""),
+                paste("IDHmut\n1p19q non-codel\n[N= ",nMT1p19qnoncodel,"]", sep = "")),
+     padj = 1,
+     cex = 1.2)
+  axis(2, lwd = 2.75)
+  # y axis label
+  mtext(side = 2, "Methylation [beta value]", line = 2.5, cex = 1)
+  # first horizontal significance bar (LGG IDHwt vs LGG IDHmut codel, p < 0.001)
+  x1 <- 1
+  x2 <- x1 + 1
+  y1 <- 1
+  y_offset <- -0.03
+  lines(c(x1, x2 - 0.1), c(y1, y1), lwd = 2)
+  lines(c(x1, x1), c(y1, y1 + y_offset), lwd = 2)
+  lines(c(x2 - 0.1,  x2 - 0.1), c(y1, y1 + y_offset), lwd = 2)
+  points(1.5, y1 + 0.04, pch = "*", cex = p.size)
+  # second horizontal significance bar (LGG IDHwt vs LGG IDHmut non-codel, p < 0.001)
+  x3 <- x2 + 1
+  y2 <- 1.1
+  y_offset <- -0.03
+  lines(c(x1, x3), c(y2, y2), lwd = 2)
+  lines(c(x1, x1), c(y2, y2 + y_offset), lwd = 2)
+  lines(c(x3, x3), c(y2, y2 + y_offset), lwd = 2)
+  points(2, y2 + 0.04, pch = "*", cex = p.size)
+  #text(1.5, y1 + 0.04, "N.S.", cex = 1)
+  # second horizontal significance bar (LGG IDHmut codel vs LGG IDHmut non-codel, n.s.)
+  x3 <- x2 + 1
+  y_offset <- -0.03
+  lines(c(x2 + 0.1, x3), c(y1, y1), lwd = 2)
+  lines(c(x2 + 0.1, x2 + 0.1), c(y1, y1 + y_offset), lwd = 2)
+  lines(c(x3, x3), c(y1, y1 + y_offset), lwd = 2)
+  text(2.5, y1 + 0.05, "N.S.", cex = 1)
+  })
+
+
+```
+
+***********************
+### GBM
+#### XY Plots of PD-L1 expression and DNA methylation (top 2 CpGs) for GBM
+```{r GBM_PDL1_methylation_expression_correlation, tidy=TRUE, tidy.opts=list(width.cutoff=50), eval = T}
+load("~/Data/Collaborations/LGG_PDL1/GBM.PDL1.methylation_expression.rda")
+GBMData <- GBM.PDL1.methylation_expression[, grep("cg", colnames(GBM.PDL1.methylation_expression))]
+GBMData <- as.matrix(GBMData)
+class(GBMData) <- "numeric"
+
+
+# calculating correlations for GBM data
+methExpCorGBM <- sapply(colnames(GBM.PDL1.methylation_expression)[grep("cg", colnames(GBM.PDL1.methylation_expression))], function(x){
+  IDHwt <- cor(as.numeric(GBM.PDL1.methylation_expression[, x]), 
+               as.numeric(GBM.PDL1.methylation_expression[, "PDL1"]), 
+               method = "spearman")
+})
+
+
+# plot the data for the top 2 CpGs from LGG data
+cpgs <- names(sort(methExpCorLGG)[c(1,2)])
+#par(mfrow = c(2,1))
+nWT <- table(GBM.PDL1.methylation_expression$IDH_status)[1]
+nMT <- table(GBM.PDL1.methylation_expression$IDH_status)[2]
+methExpXYPlotLGG <- sapply(cpgs, function(x){
+  c1 <- cor.test(as.numeric(GBM.PDL1.methylation_expression[, x]), 
+            as.numeric(GBM.PDL1.methylation_expression[, "PDL1"]), 
+            method = "spearman",
+            exact = F)
+  cp1 <- c1$p.value
+  if (round(cp1, 2)  < 0.01) {
+    pval_text <- "p-value < 0.01"
+  } else {
+    pval_text <- paste("p-value = ", round(cp1, 2), sep = "" )
+  }
+  c1 <- round(c1$estimate, 2)
+  p1 <-plot(as.numeric(GBM.PDL1.methylation_expression[, x]), 
+            as.numeric(GBM.PDL1.methylation_expression[, "PDL1"]),
+            xlab = paste("Methylation ", x, " [beta value]", sep = ""),
+            ylab = "PD-L1 [log2(FPKM+1)]",
+            xlim = c(0,1),
+            ylim = c(0,11),
+            main = paste("TCGA GBM Correlation ", c1, " [Spearman]\n",pval_text, sep = ""),
+            pch = c(16, 17)[as.numeric(GBM.PDL1.methylation_expression$IDH_status)],
+            col = c("blue", "red")[as.numeric(GBM.PDL1.methylation_expression$IDH_status)],
+            frame.plot = F)
+  legend("topleft", 
+         legend = c(paste("IDHwt [N= ",nWT,"]", sep = ""),
+                    paste("IDHmut [N= ",nMT,"]", sep = "")),
+         col = c("blue", "red"), 
+         pch = c(16,17),
+         cex = 1,
+         bty = "n")
+  abline(lm(as.numeric(GBM.PDL1.methylation_expression[, "PDL1"]) ~ as.numeric(GBM.PDL1.methylation_expression[, x])), lwd = 2)
+  lines(lowess(as.numeric(GBM.PDL1.methylation_expression[, "PDL1"]) ~ as.numeric(GBM.PDL1.methylation_expression[, x])), col = "green", lwd = 2)
+})
+
+```
+
+```{r GBM_PDL1_methylation_boxplots, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
+PDL1MethylationBoxPlotGBM <- sapply(names(sort(methExpCorLGG)[c(1,2)]), function(x){
+  t1 <- t.test(GBM.PDL1.methylation_expression[,x] ~ GBM.PDL1.methylation_expression[,"IDH_status"])
+  if (round(t1$p.value, 2)  < 0.01) {
+    pval_text <- "p-value < 0.01"
+  } else {
+    pval_text <- paste("p-value = ", round(t1$p.value, 2), sep = "" )
+  }
+  
+  p1 <- boxplot(GBM.PDL1.methylation_expression[,x] ~ GBM.PDL1.methylation_expression[,"IDH_status"],
+                axes = FALSE,
+                frame = FALSE,
+                lwd = 2,
+                ylim = c(0,1.2),
+                main = paste("450k probe ", x, " [beta value]\n", pval_text, sep = ""))
+  axis(1, lwd = 2.75,
+     at = c(1,2), 
+     labels = c(paste("IDH wt\n[N = ", nWT,"]", sep = ""),
+                paste("IDH mut\n[N = ", nMT, "]", sep = "")),
+     padj = 1,
+     cex = 1.2)
+  axis(2, lwd = 2.75)
+  # first horizontal significance bar (LGG IDHmut nonCodel - LGG IDHmut_coDel, p < 0.001)
+  x1 <- 1
+  x2 <- x1 + 1
+  y1 <- 1
+  y_offset <- -0.03
+  lines(c(x1, x2), c(y1, y1), lwd = 2)
+  lines(c(x1, x1), c(y1, y1 + y_offset), lwd = 2)
+  lines(c(x2, x2), c(y1, y1 + y_offset), lwd = 2)
+  points(1.5, y1 + 0.04, pch = "*", cex = p.size)
+  #text(1.5, y1 + 0.04, "N.S.", cex = 1)
+  })
+
+```
+
+## Appendix: Data preparation
+### Table loading and combininig
+```{r data_preparation_01, tidy=TRUE, tidy.opts=list(width.cutoff=50), eval = T}
+require(GenomicRanges)
+#-- load the prepared sample annotations --------------
+load("~/Data/TCGA/GBM/Ceccarelli_et_al._2016/glioma_annotations.rda")
+glioma_annotations$Case <- as.character(glioma_annotations$Case)
+```
+
+```{r data_preparation_02, tidy=TRUE, tidy.opts=list(width.cutoff=50), eval = F}
+#-- load TCGA glioma RNA-Seq data from pre-processing step --------------
+load("~/Data/Collaborations/LGG_PDL1/tcga_gliomas_rna_seq.rda")
+tcga_gliomas_rna_seq <- log2(tcga_gliomas_rna_seq + 1)
+
+#-- load 450k methylation and annotation data from pre-processing step --------------
+load("~/Data/References/Annotations/Platforms/gr.annot450k.rda")
+load("~/Data/TCGA/GBM/Infinium450k/tcga.gbm.450k.rda")
+load("~/Data/Collaborations/LGG_PDL1/tcga.lgg.450k.rda")
+tcga_gliomas_450k <- merge(tcga.lgg.450k, tcga.gbm.450k, by.x = "row.names", by.y = "row.names")
+
+# select only samples which have expression and annotation data available
+exp_samples <- intersect(rownames(glioma_annotations), colnames(tcga_gliomas_rna_seq))
+meth_samples <- intersect(rownames(glioma_annotations), colnames(tcga_gliomas_450k))
+exp_meth_samples <- intersect(exp_samples, meth_samples)
+tcga_gliomas_rna_seq <- tcga_gliomas_rna_seq[,exp_samples]
+tcga_gliomas_450k <- tcga_gliomas_450k[,meth_samples]
+
+```
+
+*********
+
+```{r pdl1_idh_mut_wt, tidy=TRUE, tidy.opts=list(width.cutoff=50), eval = F}
+#-- collate PD-L1 expression levels and tumor annotation data
+plotData <- as.data.frame(glioma_annotations[exp_samples, c("Study", "Grade","IDH.status", "IDH.codel.subtype", "Supervised.DNA.Methylation.Cluster")])
+plotData <- cbind(plotData, as.numeric(tcga_gliomas_rna_seq[grep("CD274", rownames(tcga_gliomas_rna_seq)), exp_samples]))
+colnames(plotData)[6] <- "PDL1"
+levels(plotData$Study) <- c("LGG", "GBM")
+plotData$combined <- NA 
+plotData[which(plotData$Study == "GBM" & plotData$IDH.codel.subtype == "IDHwt"),]$combined <- "GBM_IDHwt"
+plotData[which(plotData$Study == "GBM" & plotData$IDH.codel.subtype == "IDHmut-non-codel"),]$combined <- "GBM_IDHmut"
+plotData[which(plotData$Study == "LGG" & plotData$IDH.codel.subtype == "IDHwt"),]$combined <- "LGG_IDHwt"
+plotData[which(plotData$Study == "LGG" & plotData$IDH.codel.subtype == "IDHmut-non-codel"),]$combined <- "LGG_IDHmut_nonCoDel"
+plotData[which(plotData$Study == "LGG" & plotData$IDH.codel.subtype == "IDHmut-codel"),]$combined <- "LGG_IDHmut_coDel"
+plotData$combined <- as.factor(plotData$combined)
+plotData$combined2 <- as.character(plotData$combined)
+plotData[grep("GBM", plotData$combined2),]$combined2 <- "GBM"
+plotData$combined2 <- as.factor(plotData$combined2)
+plotData$combined2 <- factor(plotData$combined2, levels = levels(plotData$combined2)[c(2,3,4,1)])
+save(plotData, file = "~/Data/Collaborations/LGG_PDL1/plotData.rda")
+LGGs <- which(plotData$Study == "LGG")
+```
 
 ### Collating PD-L1 expression and methylation data
-```{r PDL1_methylation_expression_data, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
+```{r PDL1_methylation_expression_data, tidy=TRUE, tidy.opts=list(width.cutoff=50), eval = F}
 # GBM data
 # get CD274 probes
 i1 <- intersect(exp_meth_samples, glioma_annotations[glioma_annotations$Study == "Glioblastoma multiforme",]$Case)
 GBM.PDL1.methylation_expression <- as.data.frame(cbind(IDH_status = as.character(glioma_annotations[i1, "IDH.status"]),
                                                        t(tcga.gbm.450k[names(gr.annot450k[grep("CD274", gr.annot450k$UCSC_RefGene_Name)]), i1]),
-                                                       CD274 = as.numeric(tcga_gliomas_rna_seq[grep("CD274", rownames(tcga_gliomas_rna_seq)), i1])))
+                                                       PDL1 = as.numeric(tcga_gliomas_rna_seq[grep("CD274", rownames(tcga_gliomas_rna_seq)), i1])))
 for (i in colnames(GBM.PDL1.methylation_expression[grep("IDH", colnames(GBM.PDL1.methylation_expression), invert = T)])){
   GBM.PDL1.methylation_expression[,i] <- as.numeric(as.character(GBM.PDL1.methylation_expression[,i]))
 }
 GBM.PDL1.methylation_expression$IDH_status <- as.factor(GBM.PDL1.methylation_expression$IDH_status)
 GBM.PDL1.methylation_expression$IDH_status <- relevel(GBM.PDL1.methylation_expression$IDH_status, ref = "WT")
+save(GBM.PDL1.methylation_expression, file = "~/Data/Collaborations/LGG_PDL1/GBM.PDL1.methylation_expression.rda")
 
 # LGG data
 i2 <- intersect(exp_meth_samples, glioma_annotations[glioma_annotations$Study == "Brain Lower Grade Glioma",]$Case)
@@ -235,7 +510,7 @@ LGG.PDL1.methylation_expression <- as.data.frame(cbind(IDH_status = as.character
                                                        histology = as.character(glioma_annotations[i2,]$Histology),
                                                        chr1p19q_status = as.character(glioma_annotations[i2,]$X1p.19q.codeletion),
                                                        t(tcga.lgg.450k[names(gr.annot450k[grep("CD274", gr.annot450k$UCSC_RefGene_Name)]), i2]),
-                                                       CD274 = as.numeric(tcga_gliomas_rna_seq[grep("CD274", rownames(tcga_gliomas_rna_seq)), i2])))
+                                                       PDL1 = as.numeric(tcga_gliomas_rna_seq[grep("CD274", rownames(tcga_gliomas_rna_seq)), i2])))
 for (i in colnames(LGG.PDL1.methylation_expression[grep("cg|CD", colnames(LGG.PDL1.methylation_expression), invert = F)])){
   LGG.PDL1.methylation_expression[,i] <- as.numeric(as.character(LGG.PDL1.methylation_expression[,i]))
 }
@@ -249,83 +524,9 @@ LGG.PDL1.methylation_expression[lgg.idh_mut.non_codel,]$molecular_subtype <- "ID
 LGG.PDL1.methylation_expression[lgg.idh_wt,]$molecular_subtype <- "IDHwt"
 LGG.PDL1.methylation_expression$molecular_subtype <- as.factor(LGG.PDL1.methylation_expression$molecular_subtype)
 LGG.PDL1.methylation_expression$molecular_subtype <- relevel(LGG.PDL1.methylation_expression$molecular_subtype, ref = "IDHwt")
+save(LGG.PDL1.methylation_expression, file = "~/Data/Collaborations/LGG_PDL1/LGG.PDL1.methylation_expression.rda")
 
 table(LGG.PDL1.methylation_expression$IDH_status, 
       LGG.PDL1.methylation_expression$chr1p19q_status,
       useNA = "always")
-```
-
-### XY Plots of PD-L1 expression and DNA methylation (top 2 CpGs) for LGG
-```{r LGG_PDL1_methylation_expression_correlation, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
-# preparing data
-LGGData <- LGG.PDL1.methylation_expression[, grep("cg", colnames(LGG.PDL1.methylation_expression))]
-LGGData <- as.matrix(LGGData)
-class(LGGData) <- "numeric"
-
-methExpCorLGG <- sapply(colnames(LGG.PDL1.methylation_expression)[grep("cg", colnames(LGG.PDL1.methylation_expression))], function(x){
-  IDHwt <- cor(as.numeric(LGG.PDL1.methylation_expression[, x]), 
-           log2(as.numeric(LGG.PDL1.methylation_expression[, "CD274"])+1), 
-           method = "spearman")
-})
-
-#par(mfrow = c(2,1))
-methExpXYPlotLGG <- sapply(names(sort(methExpCorLGG)[c(1,2)]), function(x){
-  c1 <- cor(as.numeric(LGG.PDL1.methylation_expression[, x]), 
-            log2(as.numeric(LGG.PDL1.methylation_expression[, "CD274"])+1), 
-            method = "spearman")
-  c1 <- round(c1, 2)
-  p1 <-plot(as.numeric(LGG.PDL1.methylation_expression[, x]), 
-            log2(as.numeric(LGG.PDL1.methylation_expression[, "CD274"])+1),
-            xlab = paste("Probe ID ", x, " [beta value]", sep = ""),
-            ylab = "PD-L1 [log2(FPKM+1)]",
-            xlim = c(0,1),
-            ylim = c(0,10),
-            main = paste("TCGA LGG\nCorrelation ", c1, " [Spearman]", sep = ""),
-            pch = c(16, 17)[as.numeric(glioma_annotations[rownames(LGGData),]$IDH.status)],
-            col = c("red", "blue")[as.numeric(glioma_annotations[rownames(LGGData),]$IDH.status)])
-  legend("topright", legend = c("IDHmut", "WT"), col = c("red", "blue"), pch = c(16,17))
-  abline(lm(log2(as.numeric(LGG.PDL1.methylation_expression[, "CD274"])+1) ~ as.numeric(LGG.PDL1.methylation_expression[, x])), lwd = 2)
-  lines(lowess(log2(as.numeric(LGG.PDL1.methylation_expression[, "CD274"])+1) ~ as.numeric(LGG.PDL1.methylation_expression[, x])), col = "green", lwd = 2)
-})
-
-```
-
-### XY Plots of PD-L1 expression and DNA methylation (top 2 CpGs) for GBM
-```{r GBM_PDL1_methylation_expression_correlation, tidy=TRUE, tidy.opts=list(width.cutoff=50)}
-GBMData <- GBM.PDL1.methylation_expression[, grep("cg", colnames(GBM.PDL1.methylation_expression))]
-GBMData <- as.matrix(GBMData)
-class(GBMData) <- "numeric"
-
-
-# calculating correlations for GBM data
-methExpCorGBM <- sapply(colnames(GBM.PDL1.methylation_expression)[grep("cg", colnames(GBM.PDL1.methylation_expression))], function(x){
-  IDHwt <- cor(as.numeric(GBM.PDL1.methylation_expression[, x]), 
-               log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1), 
-               method = "spearman")
-})
-
-
-# plot the data for the top 2 CpGs from LGG data
-cpgs <- names(sort(methExpCorLGG)[c(1,2)])
-#par(mfrow = c(2,1))
-methExpXYPlotLGG <- sapply(cpgs, function(x){
-  c1 <- cor(as.numeric(GBM.PDL1.methylation_expression[, x]), 
-            log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1), 
-            method = "spearman")
-  c1 <- round(c1, 2)
-  p1 <-plot(as.numeric(GBM.PDL1.methylation_expression[, x]), 
-            log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1),
-            xlab = paste("Probe ID ", x, " [beta value]", sep = ""),
-            ylab = "PD-L1 [log2(FPKM+1)]",
-            xlim = c(0,1),
-            ylim = c(0,10),
-            main = paste("TCGA GBM\nCorrelation ", c1, " [Spearman]", sep = ""),
-            pch = c(16, 17)[as.numeric(glioma_annotations[rownames(GBMData),]$IDH.status)],
-            col = c("red", "blue")[as.numeric(glioma_annotations[rownames(GBMData),]$IDH.status)])
-  legend("topright", legend = c("IDHmut", "WT"), col = c("red", "blue"), pch = c(16,17))
-  abline(lm(log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1) ~ as.numeric(GBM.PDL1.methylation_expression[, x])), lwd = 2)
-  lines(lowess(log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1) ~ as.numeric(GBM.PDL1.methylation_expression[, x])), col = "green", lwd = 2)
-})
-
-
 ```
