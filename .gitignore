@@ -3,5 +3,7 @@
 .Rhistory
 .Rproj.user/*
 PDL1_Analysis_cache/*
+PDL1_Analysis_files/*
+*.pdf
 .Rproj.user
 *.rda
