@@ -3,12 +3,10 @@
 .Rhistory
 .Rproj.user/*
 PDL1_Analysis_cache/*
+PDL1_Analysis_files/*
 .Rproj.user
 *.rda
 *.html
 *.png
-PDL1_Analysis.html
-PDL1_Analysis.pdf
+*.pdf
 ._.DS_Store
-._PDL1_Analysis.pdf
-Rplot.pdf
