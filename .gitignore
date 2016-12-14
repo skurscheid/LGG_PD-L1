@@ -4,6 +4,8 @@
 .Rproj.user/*
 PDL1_Analysis_cache/*
 PDL1_Analysis_files/*
+tcga_lgg_survival_data_files/*
+*.html
 *.pdf
 .Rproj.user
 *.rda
