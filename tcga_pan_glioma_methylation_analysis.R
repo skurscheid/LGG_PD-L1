@@ -110,7 +110,9 @@ for (i in colnames(LGG.PDL1.methylation_expression[grep("cg|CD", colnames(LGG.PD
 }
 LGG.PDL1.methylation_expression$IDH_status <- relevel(LGG.PDL1.methylation_expression$IDH_status, ref = "WT")
 
-table(LGG.PDL1.methylation_expression$IDH_status, LGG.PDL1.methylation_expression$chr1p19q_status)
+table(LGG.PDL1.methylation_expression$IDH_status, 
+      LGG.PDL1.methylation_expression$chr1p19q_status,
+      useNA = "always")
 lgg.idh_mut.codel <- which(LGG.PDL1.methylation_expression$IDH_status == "Mutant" & LGG.PDL1.methylation_expression$chr1p19q_status == "codel")
 lgg.idh_mut.non_codel <- which(LGG.PDL1.methylation_expression$IDH_status == "Mutant" & LGG.PDL1.methylation_expression$chr1p19q_status == "non-codel")
 lgg.idh_wt <- which(LGG.PDL1.methylation_expression$IDH_status == "WT")
@@ -176,7 +178,8 @@ methExpXYPlotLGG <- sapply(names(sort(methExpCorLGG)[c(1,2)]), function(x){
             xlab = paste("Probe ID ", x, " [beta value]", sep = ""),
             ylab = "PD-L1 [log2(FPKM+1)]",
             xlim = c(0,1),
-            main = paste("Correlation ", c1, " [Spearman]", sep = ""),
+            ylim = c(0,10),
+            main = paste("TCGA LGG\nCorrelation ", c1, " [Spearman]", sep = ""),
             pch = c(16, 17)[as.numeric(glioma_annotations[rownames(LGGData),]$IDH.status)],
             col = c("red", "blue")[as.numeric(glioma_annotations[rownames(LGGData),]$IDH.status)])
   legend("topright", legend = c("IDHmut", "WT"), col = c("red", "blue"), pch = c(16,17))
@@ -210,7 +213,32 @@ methExpXYPlotLGG <- sapply(colnames(GBMData), function(x){
             xlab = paste("Probe ID ", x, " [beta value]", sep = ""),
             ylab = "PD-L1 [log2(FPKM+1)]",
             xlim = c(0,1),
+            ylim = c(0,10),
             main = paste("Correlation ", c1, " [Spearman]", sep = ""),
+            pch = c(16, 17)[as.numeric(glioma_annotations[rownames(GBMData),]$IDH.status)],
+            col = c("red", "blue")[as.numeric(glioma_annotations[rownames(GBMData),]$IDH.status)])
+  legend("topright", legend = c("IDHmut", "WT"), col = c("red", "blue"), pch = c(16,17))
+  abline(lm(log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1) ~ as.numeric(GBM.PDL1.methylation_expression[, x])), lwd = 2)
+  lines(lowess(log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1) ~ as.numeric(GBM.PDL1.methylation_expression[, x])), col = "green", lwd = 2)
+})
+dev.off()
+
+# plot the data for the top 2 CpGs from LGG data
+cpgs <- names(sort(methExpCorLGG)[c(1,2)])
+pdf("TCGA_GBM_PDL1_methylation_expression_XY_plots_top2.pdf")
+par(mfrow = c(2,1))
+methExpXYPlotLGG <- sapply(cpgs, function(x){
+  c1 <- cor(as.numeric(GBM.PDL1.methylation_expression[, x]), 
+            log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1), 
+            method = "spearman")
+  c1 <- round(c1, 2)
+  p1 <-plot(as.numeric(GBM.PDL1.methylation_expression[, x]), 
+            log2(as.numeric(GBM.PDL1.methylation_expression[, "CD274"])+1),
+            xlab = paste("Probe ID ", x, " [beta value]", sep = ""),
+            ylab = "PD-L1 [log2(FPKM+1)]",
+            xlim = c(0,1),
+            ylim = c(0,10),
+            main = paste("TCGA GBM\nCorrelation ", c1, " [Spearman]", sep = ""),
             pch = c(16, 17)[as.numeric(glioma_annotations[rownames(GBMData),]$IDH.status)],
             col = c("red", "blue")[as.numeric(glioma_annotations[rownames(GBMData),]$IDH.status)])
   legend("topright", legend = c("IDHmut", "WT"), col = c("red", "blue"), pch = c(16,17))

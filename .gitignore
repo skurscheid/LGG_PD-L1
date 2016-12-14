@@ -9,3 +9,5 @@ tcga_lgg_survival_data_files/*
 *.pdf
 .Rproj.user
 *.rda
+*.html
+*.png
